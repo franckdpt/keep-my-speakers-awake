@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prepare-sites-build.mjs",
+    "build": "vite build && node scripts/prerender.mjs && node scripts/prepare-sites-build.mjs && node scripts/validate-seo.mjs",
     "build:kmsa": "KMSA_BASE_PATH=/kmsa/ npm run build",
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs"

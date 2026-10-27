@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DOWNLOAD_URL } from './download.js';
+import { SEO } from './seo.js';
 
 const basePath = import.meta.env.BASE_URL;
 
@@ -10,7 +11,6 @@ const copy = {
     download: 'Download for Mac',
     speakersAlt: 'A Focal studio monitor and a KRK studio monitor with its yellow speaker cone.',
     language: 'Choose language',
-    pageDescription: 'A tiny Mac app that prevents studio monitor standby. Apple Silicon, macOS 14.2 or later.',
   },
   fr: {
     title: 'Gardez vos enceintes éveillées.',
@@ -18,7 +18,6 @@ const copy = {
     download: 'Télécharger pour Mac',
     speakersAlt: 'Une enceinte de monitoring Focal et une enceinte KRK avec son haut-parleur jaune.',
     language: 'Choisir la langue',
-    pageDescription: 'Une petite app Mac qui évite la veille des enceintes de monitoring. Pour Apple Silicon, macOS 14.2 ou ultérieur.',
   },
 };
 
@@ -30,18 +29,21 @@ function initialLanguage() {
   return (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
 }
 
-export function App() {
-  const [language, setLanguage] = useState(initialLanguage);
+export function App({ initialLanguage: seedLanguage = 'en', autoDetect = true }) {
+  const [language, setLanguage] = useState(seedLanguage);
   const text = copy[language];
 
   useEffect(() => {
+    if (autoDetect) setLanguage(initialLanguage());
+  }, [autoDetect]);
+
+  useEffect(() => {
     document.documentElement.lang = language;
-    document.title = `${text.title} — KMSA`;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', text.pageDescription);
+    document.title = SEO[language].title;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', SEO[language].description);
   }, [language, text]);
 
-  function changeLanguage(next) {
-    setLanguage(next);
+  function rememberLanguage(next) {
     try { localStorage.setItem('kmsa.language', next); } catch { /* Keep the selection for this visit. */ }
   }
 
@@ -50,9 +52,9 @@ export function App() {
       <header className="site-header">
         <a className="wordmark" href={basePath} aria-label="Keep My Speakers Awake">KMSA<span className="status-dot" aria-hidden="true" /></a>
         <nav className="language-switch" aria-label={text.language}>
-          <button type="button" lang="en" aria-label="English" aria-pressed={language === 'en'} onClick={() => changeLanguage('en')}>EN</button>
+          <a href={basePath} lang="en" aria-label="English" aria-current={language === 'en' ? 'page' : undefined} onClick={() => rememberLanguage('en')}>EN</a>
           <span aria-hidden="true">/</span>
-          <button type="button" lang="fr" aria-label="Français" aria-pressed={language === 'fr'} onClick={() => changeLanguage('fr')}>FR</button>
+          <a href={`${basePath}fr/`} lang="fr" aria-label="Français" aria-current={language === 'fr' ? 'page' : undefined} onClick={() => rememberLanguage('fr')}>FR</a>
         </nav>
       </header>
       <main className="hero">
@@ -61,7 +63,10 @@ export function App() {
           <p className="tagline">{text.tagline}</p>
         </div>
         <div className="speakers">
-          <img src={`${basePath}assets/speakers.png`} alt={text.speakersAlt} fetchPriority="high" draggable="false" />
+          <picture>
+            <source srcSet={`${basePath}assets/speakers.webp`} type="image/webp" />
+            <img src={`${basePath}assets/speakers.png`} width="1484" height="1060" alt={text.speakersAlt} fetchPriority="high" draggable="false" />
+          </picture>
         </div>
         <div className="actions">
           <a className="download" href={DOWNLOAD_URL}>{text.download}</a>

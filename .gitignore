@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+output/
+native/.build/
+native/Sources/KMSA/Resources/*.wav
+native/Sources/KMSA/Resources/profiles.json
+landing/dist/
+landing/qa/
+landing/public/downloads/
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision

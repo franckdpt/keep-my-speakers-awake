@@ -1,0 +1,13 @@
+{
+  "name": "kmsa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check:native": "swift run --package-path native KMSAChecks",
+    "build": "node native/scripts/build.mjs",
+    "package:dmg": "node scripts/package-dmg.mjs",
+    "publish:release": "node scripts/publish-release.mjs"
+  },
+  "engines": { "node": ">=24" }
+}

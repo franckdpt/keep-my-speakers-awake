@@ -14,7 +14,7 @@ export function renderHead(language) {
     name:text.title,
     description:text.description,
     inLanguage:language,
-    about:{'@id':'https://github.com/franckdpt/kmsa'},
+    about:{'@id':'https://github.com/franckdpt/keep-my-speakers-awake'},
     isPartOf:{'@type':'WebSite','@id':'https://franckdupont.com/#website',url:'https://franckdupont.com/',name:'Franck Dupont'},
     primaryImageOfPage:{'@type':'ImageObject',url:OG_IMAGE,width:1200,height:630,caption:text.imageAlt},
   };

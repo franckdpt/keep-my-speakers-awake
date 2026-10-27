@@ -121,6 +121,9 @@ ten minutes. Duplicate wake notifications do not repeat it. Existing playback
 protections still apply; blocked return signals are discarded. Adds local rotating
 diagnostics and a **Show logs / Afficher les logs** footer button.
 
+Version 1.6.6 replaces the log-access button with a GitHub link for stars, issues
+and source code, and follows the repository rename to `keep-my-speakers-awake`.
+
 ## Build and open
 
 From the repository root, with Apple's Command Line Tools and Node.js installed:

@@ -32,7 +32,11 @@ function optionalGet(path) {
   throw new Error(result.stderr);
 }
 
-const notes = `Native menu bar app for Apple Silicon. Requires macOS ${version.minimumMacOS} or later.\n\nDownload **${ASSET_NAME}** below, open it and drag the app into Applications.\n\nBuild ${version.build}; version and arm64 architecture verified from the app mounted from this DMG. SHA-256 and source revision are included in the attached manifest.\n\nThis build is locally ad-hoc signed and is not Apple notarized.\n\n${version.version === '1.6.5' ? 'Fixes wake-up scheduling after screen sleep or session locking, and adds local diagnostics access. Existing playback protections remain in place.\n' : ''}`;
+const changes = await readFile(new URL(`../release-notes/${version.version}.md`, import.meta.url),'utf8').catch(error => {
+  if (error.code === 'ENOENT') return '';
+  throw error;
+});
+const notes = `${changes.trim()}\n\nNative menu bar app for Apple Silicon. Requires macOS ${version.minimumMacOS} or later.\n\nDownload **${ASSET_NAME}** below, open it and drag the app into Applications.\n\nBuild ${version.build}; version and arm64 architecture verified from the app mounted from this DMG. SHA-256 and source revision are included in the attached manifest.\n\nThis build is locally ad-hoc signed and is not Apple notarized.\n`;
 let release = optionalGet(`repos/${repository}/releases/tags/${tag}`);
 if (release && !release.draft) throw new Error('This release is already published. Published assets are never replaced.');
 if (!release) release = api(`repos/${repository}/releases`,'POST',{

@@ -7,7 +7,7 @@ French / English copy. Uses a low-frequency signal on the Mac's built-in analog
 jack output. Microphone activity and other playback protections are checked
 before signals. Speaker wake-up effectiveness depends on the hardware.
 
-**[Download the latest DMG](https://github.com/franckdpt/kmsa/releases/latest/download/Keep-My-Speakers-Awake-Apple-Silicon.dmg)** · [Website](https://franckdupont.com/kmsa/)
+**[Download the latest DMG](https://github.com/franckdpt/keep-my-speakers-awake/releases/latest/download/Keep-My-Speakers-Awake-Apple-Silicon.dmg)** · [Website](https://franckdupont.com/kmsa/)
 
 Open the DMG and drag **Keep My Speakers Awake.app** to Applications. Current
 releases use a local ad-hoc signature and are **not Apple notarized**.
@@ -32,12 +32,12 @@ mounted from the DMG. Outputs are in `output/releases/`.
 
 1. Update **`version.json`**: increase `version` and `build`. This is the source of
    truth for the app bundle and menu-bar version label.
-2. Commit and push the app changes to `main`.
+2. Optionally add release notes in `release-notes/<version>.md`, then commit and push the app changes to `main`.
 3. Push the matching tag, for example:
 
    ```sh
-   git tag v1.6.6
-   git push origin v1.6.6
+   git tag v1.6.7
+   git push origin v1.6.7
    ```
 
 GitHub Actions builds on an Apple Silicon runner, runs the checks and creates

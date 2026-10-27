@@ -593,12 +593,12 @@ struct ControlPanel: View {
             HStack {
                 Text("KMSA · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")").font(.caption2).foregroundStyle(.secondary)
                 Spacer()
-                Button {
-                    NSWorkspace.shared.open(DiagnosticLog.directory)
-                } label: { Image(systemName: "doc.text.magnifyingglass") }
+                Link("GitHub", destination: AppLinks.repository)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                     .buttonStyle(.plain)
-                    .help(L10n.text(.showLogs))
-                    .accessibilityLabel(L10n.text(.showLogs))
+                    .help(L10n.text(.githubRepository))
+                    .accessibilityLabel(L10n.text(.githubRepository))
                 Button(L10n.text(.quit)) { model.stop(); NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
             }
         }

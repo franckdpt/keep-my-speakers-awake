@@ -18,6 +18,10 @@ public enum L10n {
     public static func text(_ key: AppText) -> String { key.localized(in: language) }
 }
 
+public enum AppLinks {
+    public static let repository = URL(string: "https://github.com/franckdpt/keep-my-speakers-awake")!
+}
+
 /// Exhaustive bilingual copy shared by controls, help, accessibility and model messages.
 public enum AppText: String, CaseIterable {
     case subtitle
@@ -33,7 +37,7 @@ public enum AppText: String, CaseIterable {
     case openAtLogin
     case noJack
     case quit
-    case showLogs
+    case githubRepository
     case paused
     case wakePlaying
     case ready
@@ -77,7 +81,7 @@ public enum AppText: String, CaseIterable {
         case .smartModeHint: copy = ("Afficher les règles de réveil des enceintes", "Show the speaker wake-up rules")
         case .openAtLogin: copy = ("Ouvrir avec la session", "Open at login")
         case .noJack: copy = ("Pas de connexion jack détectée", "No jack connection detected")
-        case .showLogs: copy = ("Afficher les logs", "Show logs")
+        case .githubRepository: copy = ("GitHub : étoiles, questions et signalements", "GitHub: stars, issues and source code")
         case .quit: copy = ("Quitter", "Quit")
         case .paused: copy = ("En pause", "Paused")
         case .wakePlaying: copy = ("Réveil en cours…", "Wake-up in progress…")

@@ -19,7 +19,7 @@ test('old releases never replace a newer latest version', () => {
 });
 
 test('the public download uses the stable GitHub latest-asset route', () => {
-  assert.equal(LATEST_DOWNLOAD, `https://github.com/franckdpt/kmsa/releases/latest/download/${ASSET_NAME}`);
+  assert.equal(LATEST_DOWNLOAD, `https://github.com/franckdpt/keep-my-speakers-awake/releases/latest/download/${ASSET_NAME}`);
   assert.equal(DOWNLOAD_URL, LATEST_DOWNLOAD);
 });
 

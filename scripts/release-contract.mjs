@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 export const ASSET_NAME = 'Keep-My-Speakers-Awake-Apple-Silicon.dmg';
-export const REPOSITORY = 'franckdpt/kmsa';
+export const REPOSITORY = 'franckdpt/keep-my-speakers-awake';
 export const LATEST_DOWNLOAD = `https://github.com/${REPOSITORY}/releases/latest/download/${ASSET_NAME}`;
 
 export function validateVersion(value) {

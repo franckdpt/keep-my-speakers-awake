@@ -33,9 +33,14 @@ struct UpdateControl: View {
                     }
                 } else if updater.isUpToDate {
                     HStack(spacing: 8) {
-                        Label(L10n.text(.appUpToDate), systemImage: "checkmark.circle")
+                        Label {
+                            Text(L10n.text(.appUpToDate))
+                                .foregroundStyle(.secondary)
+                        } icon: {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundStyle(.green)
+                        }
                             .font(.caption)
-                            .foregroundStyle(.secondary)
                             .fixedSize()
                         Spacer(minLength: 0)
                         Button(L10n.text(.checkUpdates), action: action)

@@ -169,7 +169,7 @@ final class UpdateModel: ObservableObject {
 
     private static func isFresh(_ date: Date, at now: Date) -> Bool {
         let age = now.timeIntervalSince(date)
-        return age >= 0 && age < UpdateCheckSchedule.dailyInterval
+        return age >= 0 && age < UpdateCheckSchedule.confirmationLifetime
     }
 
     private func confirmCurrent(at date: Date) {

@@ -55,7 +55,7 @@ Applications shortcut. Outputs are in `output/releases/`.
 From 1.7.0, users can choose **Check for Updates…** in the app, then **Install and
 Relaunch**. It uses the official GitHub release DMG and manifest, verifies their
 SHA-256 digests and app contents, and retains a recovery copy of the previous app.
-From 1.7.1, checks also run at app startup and every 24 hours, with a small menu-bar
+Checks also run at app startup and every 12 hours, with a small menu-bar
 badge when an update is available and a clear up-to-date message otherwise.
 Installation still requires a click. No extra update feed or credentials are needed.
 

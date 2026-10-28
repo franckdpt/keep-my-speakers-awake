@@ -95,6 +95,7 @@ enum EntryPoint {
             return
         }
         if CommandLine.arguments.contains("--self-check") {
+            AppModel.runCountdownChecks()
             let suite = "fr.franckdupont.kmsa.check.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suite)!
             defer { defaults.removePersistentDomain(forName: suite) }
@@ -576,7 +577,8 @@ struct ControlPanel: View {
                     if model.isTesting { model.stop(); model.refresh() }
                     else { model.testSignal() }
                 } label: {
-                    Text(model.isTesting ? L10n.text(.stopTest) : L10n.text(.testWake))
+                    Text(model.wakeTestTitle)
+                        .monospacedDigit()
                         .frame(maxWidth: .infinity)
                 }
                 .controlSize(.large).disabled(!model.isTesting && !model.canTest)

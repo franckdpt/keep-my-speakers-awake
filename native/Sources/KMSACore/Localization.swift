@@ -93,7 +93,7 @@ public enum AppText: String, CaseIterable {
         case .installAndRelaunch: copy = ("Installer et relancer", "Install and Relaunch")
         case .installUpdate: copy = ("Installer la mise à jour…", "Install Update…")
         case .updateToVersion: copy = ("Mettre à jour vers", "Update to")
-        case .automaticUpdateChecks: copy = ("Vérification au démarrage, puis toutes les 24 h.", "Checked at startup, then every 24 hours.")
+        case .automaticUpdateChecks: copy = ("Vérification au démarrage, puis toutes les 12 h.", "Checked at startup, then every 12 hours.")
         case .later: copy = ("Plus tard", "Later")
         case .downloadingUpdate: copy = ("Téléchargement…", "Downloading…")
         case .verifyingUpdate: copy = ("Vérification…", "Verifying…")

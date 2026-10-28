@@ -129,6 +129,18 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var canTest: Bool { block(trigger: .manualTest) == nil && !profiles.isEmpty }
     var selectedProfile: SignalProfile? { profiles.first { $0.id == profileID } }
     var isTesting: Bool { playing && currentTrigger == .manualTest }
+    var testSecondsRemaining: Int? {
+        guard isTesting, let player, player.duration.isFinite, player.currentTime.isFinite,
+              player.duration >= 0, player.currentTime >= 0 else { return nil }
+        let remaining = ceil(max(0, player.duration - player.currentTime))
+        guard remaining.isFinite, remaining < Double(Int.max) else { return nil }
+        return Int(remaining)
+    }
+    var wakeTestTitle: String {
+        guard isTesting else { return L10n.text(.testWake) }
+        guard let remaining = testSecondsRemaining else { return L10n.text(.stopTest) }
+        return "\(L10n.text(.stopTest)) (\(remaining) s)"
+    }
 
     private func block(trigger: PlaybackTrigger) -> PlaybackBlock? {
         PlaybackPolicy.block(enabled: enabled, trigger: trigger,

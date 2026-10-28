@@ -1,4 +1,5 @@
 import AVFAudio
+import Foundation
 
 // Substitute an in-memory player when checking triggers, so verification never emits audio.
 protocol SignalPlayer: AnyObject {
@@ -6,6 +7,8 @@ protocol SignalPlayer: AnyObject {
     var volume: Float { get set }
     var numberOfLoops: Int { get set }
     var delegate: AVAudioPlayerDelegate? { get set }
+    var duration: TimeInterval { get }
+    var currentTime: TimeInterval { get }
     func prepareToPlay() -> Bool
     func play() -> Bool
     func stop()
@@ -17,6 +20,8 @@ final class SilentCheckPlayer: SignalPlayer {
     var currentDevice: String?
     var volume: Float = 0
     var numberOfLoops = 0
+    var duration: TimeInterval = 6
+    var currentTime: TimeInterval = 0
     weak var delegate: AVAudioPlayerDelegate?
     var onPlay: () -> Bool = { false }
     var onPrepare: () -> Bool = { true }

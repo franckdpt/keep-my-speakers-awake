@@ -3,7 +3,7 @@
 A standalone menu bar app for macOS 14.2 or later. It does not need Chrome, a
 browser extension, a server, a microphone recording permission, or an account.
 It never changes the Mac's volume or chosen output. Speaker wake-ups work offline.
-Update checks contact GitHub at app startup and every 24 hours while the app runs;
+Update checks contact GitHub at app startup and every 12 hours while the app runs;
 downloads/installations require a click. There is no account, telemetry or upload.
 
 Version 1.1.0 adds camera-activity protection, blocks manual tests while smart
@@ -154,9 +154,14 @@ successful check or installation. The version-specific confirmation expires afte
 24 hours, survives relaunches without extending the expiry, and is invalidated by
 a failed check or detected update. The manual search button is slightly larger.
 
+Version 1.7.6 shows the remaining manual-test seconds beside **Arrêter le test /
+Stop test**, based on the player's actual position. The up-to-date checkmark is
+green. Silent update checks run every 12 hours; the confirmation message still
+has an independent 24-hour lifetime.
+
 ## In-app updates
 
-Update checks run at app startup and every 24 hours, with a manual check available
+Update checks run at app startup and every 12 hours, with a manual check available
 at any time. Sleep/session-return notifications run a due check; repeated
 notifications do not duplicate requests. A failed check retries after one hour,
 keeps any previously detected update badge and never claims the app is up to date.

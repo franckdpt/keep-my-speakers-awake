@@ -40,13 +40,13 @@ extension UpdateModel {
         expect(calls == 1 && model.status == .appUpToDate && !model.hasUpdate && !model.busy)
         await model.checkAutomatically() // Duplicate startup/wake/session notifications coalesce.
         expect(calls == 1)
-        now.addTimeInterval(UpdateCheckSchedule.dailyInterval - 1)
+        now.addTimeInterval(UpdateCheckSchedule.checkInterval - 1)
         await model.checkAutomatically()
         expect(calls == 1)
         now.addTimeInterval(1)
         await model.checkAutomatically()
         expect(calls == 2 && model.hasUpdate && model.status == .updateAvailable)
-        now.addTimeInterval(UpdateCheckSchedule.dailyInterval)
+        now.addTimeInterval(UpdateCheckSchedule.checkInterval)
         await model.checkAutomatically()
         expect(calls == 3 && model.hasUpdate && model.status == .updateCheckFailed && !model.busy)
         now.addTimeInterval(UpdateCheckSchedule.retryInterval - 1)
@@ -183,6 +183,6 @@ extension UpdateModel {
         let delayedRelaunch = UpdateModel(defaults: dayOldInstall, clock: { checkedAt }, fetchLatest: { nil })
         expect(delayedRelaunch.isUpToDate)
         expect(delayedRelaunch.confirmedCurrentAt == checkedAt.addingTimeInterval(-86_399))
-        print("Passed \(count) update-model checks: daily checks, offline retry, badge, UI flow, relaunch receipt and version-bound 24-hour confirmations. No network, user preferences or audio used.")
+        print("Passed \(count) update-model checks: 12-hour checks, offline retry, badge, UI flow, relaunch receipt and version-bound 24-hour confirmations. No network, user preferences or audio used.")
     }
 }

@@ -73,6 +73,16 @@ extension UpdateModel {
         expect(manual.status == .appUpToDate && !manual.busy)
         expect(manual.isUpToDate && !manual.showsProgress)
 
+        var manualRechecks = 0
+        let recheck = UpdateModel(defaults: defaults, fetchLatest: {
+            manualRechecks += 1
+            return manualRechecks == 1 ? nil : offer
+        })
+        await recheck.check { preconditionFailure("A current-version check must not restart") }
+        expect(recheck.isUpToDate && manualRechecks == 1)
+        await recheck.check { preconditionFailure("Searching again must not install") }
+        expect(recheck.hasUpdate && !recheck.isUpToDate && manualRechecks == 2)
+
         let search = UpdateModel(defaults: defaults, fetchLatest: { offer })
         expect(search.buttonTitle == L10n.text(.checkUpdates))
         await search.check { preconditionFailure("Searching must not install or restart") }

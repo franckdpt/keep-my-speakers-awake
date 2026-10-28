@@ -146,6 +146,9 @@ versioned update button starts installation directly. Verification and restart
 use an indeterminate bar. A recent successful-install receipt preserves the
 completion message after relaunch and schedules the next check for 24 hours later.
 
+Version 1.7.4 keeps a compact **Chercher une mise à jour / Check for Updates**
+button beside the up-to-date status so a manual recheck is always accessible.
+
 ## In-app updates
 
 Update checks run at app startup and every 24 hours, with a manual check available

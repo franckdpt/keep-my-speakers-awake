@@ -32,9 +32,18 @@ struct UpdateControl: View {
                         }
                     }
                 } else if updater.isUpToDate {
-                    Label(L10n.text(.appUpToDate), systemImage: "checkmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Label(L10n.text(.appUpToDate), systemImage: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize()
+                        Spacer(minLength: 0)
+                        Button(L10n.text(.checkUpdates), action: action)
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                            .disabled(updater.busy)
+                            .help(L10n.text(.automaticUpdateChecks))
+                    }
                 } else {
                     Button(action: action) {
                         Text(updater.buttonTitle)

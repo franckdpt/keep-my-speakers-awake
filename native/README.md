@@ -149,6 +149,11 @@ completion message after relaunch and schedules the next check for 24 hours late
 Version 1.7.4 keeps a compact **Chercher une mise à jour / Check for Updates**
 button beside the up-to-date status so a manual recheck is always accessible.
 
+Version 1.7.5 shows **L’app est à jour / The app is up to date** only after a
+successful check or installation. The version-specific confirmation expires after
+24 hours, survives relaunches without extending the expiry, and is invalidated by
+a failed check or detected update. The manual search button is slightly larger.
+
 ## In-app updates
 
 Update checks run at app startup and every 24 hours, with a manual check available

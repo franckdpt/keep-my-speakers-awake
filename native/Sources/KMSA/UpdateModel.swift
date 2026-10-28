@@ -8,9 +8,13 @@ final class UpdateModel: ObservableObject {
     @Published private(set) var availableUpdate: AvailableUpdate?
     @Published private(set) var downloadProgress: Double?
     @Published private(set) var foregroundAction = false
+    @Published private(set) var confirmedCurrentAt: Date?
     var hasUpdate: Bool { availableUpdate != nil }
     var showsProgress: Bool { busy && foregroundAction }
-    var isUpToDate: Bool { status == .appUpToDate && !hasUpdate }
+    var isUpToDate: Bool {
+        guard status == .appUpToDate, !hasUpdate, let confirmedCurrentAt else { return false }
+        return Self.isFresh(confirmedCurrentAt, at: clock())
+    }
     var buttonTitle: String {
         availableUpdate.map { "\(L10n.text(.updateToVersion)) \($0.manifest.version)" } ?? L10n.text(.checkUpdates)
     }
@@ -22,6 +26,8 @@ final class UpdateModel: ObservableObject {
     private var transferID: UUID?
     private var schedule = UpdateCheckSchedule()
     private let clock: () -> Date
+    private let defaults: UserDefaults
+    private let currentVersion: String
     private let fetchLatest: () async throws -> AvailableUpdate?
     private var timer: Timer?
     private var observations: [(NotificationCenter, NSObjectProtocol)] = []
@@ -30,6 +36,8 @@ final class UpdateModel: ObservableObject {
          clock: @escaping () -> Date = Date.init,
          fetchLatest: (() async throws -> AvailableUpdate?)? = nil) {
         self.clock = clock
+        self.defaults = defaults
+        currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         self.fetchLatest = fetchLatest ?? {
             let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
             let build = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0") ?? 0
@@ -37,17 +45,24 @@ final class UpdateModel: ObservableObject {
         }
         // Preview renders neither read nor change the user's update status.
         guard !CommandLine.arguments.contains("--preview") else { return }
-        if defaults.bool(forKey: "updateInstallFailed") {
+        let installFailed = defaults.bool(forKey: "updateInstallFailed")
+        if installFailed {
             status = .updateFailed
+            clearConfirmation()
             defaults.removeObject(forKey: "updateInstallFailed")
+        }
+        if !installFailed, defaults.string(forKey: "updateConfirmedVersion") == currentVersion,
+           let checkedAt = defaults.object(forKey: "updateConfirmedAt") as? Date,
+           Self.isFresh(checkedAt, at: clock()) {
+            confirmedCurrentAt = checkedAt
+            status = .appUpToDate
         }
         let installed = defaults.string(forKey: "updateInstalledVersion")
         let installedAt = defaults.object(forKey: "updateInstalledAt") as? Date
-        let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        if let installed, installed == current, let installedAt,
-           (0...300).contains(clock().timeIntervalSince(installedAt)) {
-            status = .appUpToDate
-            schedule.finished(success: true, at: clock())
+        if !installFailed, installed == currentVersion, let installedAt,
+           Self.isFresh(installedAt, at: clock()) {
+            confirmCurrent(at: max(installedAt, confirmedCurrentAt ?? installedAt))
+            schedule.finished(success: true, at: installedAt)
         }
         defaults.removeObject(forKey: "updateInstalledVersion")
         defaults.removeObject(forKey: "updateInstalledAt")
@@ -63,7 +78,8 @@ final class UpdateModel: ObservableObject {
         let model = UpdateModel()
         model.availableUpdate = available ? sampleOffer() : nil
         model.status = available ? .updateAvailable : .appUpToDate
-        if searching { model.status = nil }
+        model.confirmedCurrentAt = available ? nil : model.clock()
+        if searching { model.status = nil; model.confirmedCurrentAt = nil }
         if downloading {
             model.busy = true
             model.foregroundAction = true
@@ -91,6 +107,7 @@ final class UpdateModel: ObservableObject {
 
     /// Silent background checks never download or install the app.
     func checkAutomatically() async {
+        expireConfirmationIfNeeded()
         guard !busy, schedule.isDue(at: clock()) else { return }
         await refresh()
     }
@@ -104,11 +121,15 @@ final class UpdateModel: ObservableObject {
         defer { busy = false; foregroundAction = false }
         do {
             availableUpdate = try await fetchLatest()
-            status = hasUpdate ? .updateAvailable : .appUpToDate
+            if hasUpdate {
+                clearConfirmation()
+                status = .updateAvailable
+            } else { confirmCurrent(at: clock()) }
             schedule.finished(success: true, at: clock())
         } catch {
             // A failed request cannot dismiss an update that was already detected,
             // and cannot claim the app is up to date.
+            clearConfirmation()
             status = Self.errorText(error)
             schedule.finished(success: false, at: clock())
         }
@@ -129,6 +150,7 @@ final class UpdateModel: ObservableObject {
                  perform: (_ progress: @escaping @Sendable (UpdateFetchProgress) -> Void) async throws -> Void) async {
         guard !busy else { return }
         availableUpdate = offer
+        clearConfirmation()
         busy = true
         foregroundAction = true
         status = .downloadingUpdate
@@ -141,8 +163,32 @@ final class UpdateModel: ObservableObject {
                 Task { @MainActor in self?.receive(progress, id: id) }
             }
             availableUpdate = nil
-            status = .appUpToDate
+            confirmCurrent(at: clock())
         } catch { status = Self.errorText(error) }
+    }
+
+    private static func isFresh(_ date: Date, at now: Date) -> Bool {
+        let age = now.timeIntervalSince(date)
+        return age >= 0 && age < UpdateCheckSchedule.dailyInterval
+    }
+
+    private func confirmCurrent(at date: Date) {
+        confirmedCurrentAt = date
+        defaults.set(currentVersion, forKey: "updateConfirmedVersion")
+        defaults.set(date, forKey: "updateConfirmedAt")
+        status = .appUpToDate
+    }
+
+    private func clearConfirmation() {
+        confirmedCurrentAt = nil
+        defaults.removeObject(forKey: "updateConfirmedVersion")
+        defaults.removeObject(forKey: "updateConfirmedAt")
+    }
+
+    private func expireConfirmationIfNeeded() {
+        guard let confirmedCurrentAt, !Self.isFresh(confirmedCurrentAt, at: clock()) else { return }
+        clearConfirmation()
+        if status == .appUpToDate { status = nil }
     }
 
     private func receive(_ progress: UpdateFetchProgress, id: UUID) {

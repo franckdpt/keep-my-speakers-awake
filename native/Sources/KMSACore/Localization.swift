@@ -87,7 +87,7 @@ public enum AppText: String, CaseIterable {
         case .githubRepository: copy = ("GitHub : étoiles, questions et signalements", "GitHub: stars, issues and source code")
         case .checkUpdates: copy = ("Chercher une mise à jour", "Check for Updates")
         case .checkingUpdates: copy = ("Recherche en cours…", "Checking for updates…")
-        case .appUpToDate: copy = ("KMSA est à jour", "KMSA is up to date")
+        case .appUpToDate: copy = ("L’app est à jour", "The app is up to date")
         case .updateAvailable: copy = ("Une mise à jour est disponible", "An update is available")
         case .updateExplanation: copy = ("La nouvelle version sera téléchargée depuis le dépôt GitHub officiel, vérifiée, puis installée. L’app redémarrera et tes réglages seront conservés.", "The new version will be downloaded from the official GitHub repository, verified and installed. The app will restart and your settings will be preserved.")
         case .installAndRelaunch: copy = ("Installer et relancer", "Install and Relaunch")

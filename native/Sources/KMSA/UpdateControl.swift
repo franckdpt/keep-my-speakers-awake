@@ -40,7 +40,7 @@ struct UpdateControl: View {
                         Spacer(minLength: 0)
                         Button(L10n.text(.checkUpdates), action: action)
                             .buttonStyle(.bordered)
-                            .controlSize(.mini)
+                            .controlSize(.small)
                             .disabled(updater.busy)
                             .help(L10n.text(.automaticUpdateChecks))
                     }

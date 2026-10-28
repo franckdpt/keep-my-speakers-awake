@@ -18,4 +18,3 @@ icon_locations = {
     'Keep My Speakers Awake.app': (160, 190),
     'Applications': (480, 190),
 }
-hide_extensions = ['Keep My Speakers Awake.app']

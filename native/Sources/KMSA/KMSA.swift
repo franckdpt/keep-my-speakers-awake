@@ -3,11 +3,19 @@ import SwiftUI
 import KMSACore
 import AVFAudio
 import ServiceManagement
+import Dispatch
 
 @main
 @MainActor
 enum EntryPoint {
     static func main() {
+        if CommandLine.arguments.contains("--update-self-check") {
+            Task { @MainActor in
+                await UpdateModel.runChecks()
+                exit(0)
+            }
+            dispatchMain()
+        }
         if CommandLine.arguments.contains("--language-check") {
             let report: [String: Any] = [
                 "language": L10n.language.rawValue,
@@ -50,7 +58,12 @@ enum EntryPoint {
             model.refresh()
             let panel = Group {
                 if CommandLine.arguments.contains("--help-content") { SmartModeHelp() }
-                else { ControlPanel(model: model) }
+                else {
+                    ControlPanel(model: model, updater: UpdateModel.preview(
+                        available: CommandLine.arguments.contains("--update-available"),
+                        searching: CommandLine.arguments.contains("--update-search"),
+                        downloading: CommandLine.arguments.contains("--update-progress")))
+                }
             }.environment(\.locale, L10n.locale)
                 .background(Color(nsColor: .windowBackgroundColor))
             let view = NSHostingView(rootView: panel)
@@ -66,11 +79,11 @@ enum EntryPoint {
         }
         if let index = CommandLine.arguments.firstIndex(of: "--preview-icons"), CommandLine.arguments.count > index + 1 {
             _ = NSApplication.shared
-            let preview = NSImage(size: NSSize(width: 64, height: 32), flipped: false) { _ in
+            let preview = NSImage(size: NSSize(width: 128, height: 32), flipped: false) { _ in
                 NSColor.white.setFill()
-                NSRect(x: 0, y: 0, width: 64, height: 32).fill()
-                for (index, active) in [false, true].enumerated() {
-                    MenuBarIcon.image(active: active)
+                NSRect(x: 0, y: 0, width: 128, height: 32).fill()
+                for (index, state) in [(false, false), (true, false), (false, true), (true, true)].enumerated() {
+                    MenuBarIcon.image(active: state.0, updateAvailable: state.1)
                         .draw(in: NSRect(x: index * 32 + 5, y: 6, width: 22, height: 20))
                 }
                 return true
@@ -78,7 +91,7 @@ enum EntryPoint {
             let bitmap = NSBitmapImageRep(data: preview.tiffRepresentation!)!
             try! bitmap.representation(using: .png, properties: [:])!
                 .write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
-            print("Rendered paused/active menu-bar icons. No audio played.")
+            print("Rendered paused/active menu-bar icons with and without an update badge. No audio played.")
             return
         }
         if CommandLine.arguments.contains("--self-check") {
@@ -464,13 +477,14 @@ enum EntryPoint {
 
 struct KMSAApplication: App {
     @StateObject private var model = AppModel(diagnostics: .shared)
+    @StateObject private var updater = UpdateModel(automaticChecks: true)
     var body: some Scene {
         MenuBarExtra {
-            ControlPanel(model: model).environment(\.locale, L10n.locale)
+            ControlPanel(model: model, updater: updater).environment(\.locale, L10n.locale)
         } label: {
-            Image(nsImage: MenuBarIcon.image(active: model.enabled && model.route.jackUID != nil))
-                .accessibilityLabel("Keep My Speakers Awake")
-                .help("Keep My Speakers Awake — \(model.status)")
+            Image(nsImage: MenuBarIcon.image(active: model.enabled && model.route.jackUID != nil, updateAvailable: updater.hasUpdate))
+                .accessibilityLabel(updater.hasUpdate ? "Keep My Speakers Awake — \(L10n.text(.updateAvailable))" : "Keep My Speakers Awake")
+                .help("Keep My Speakers Awake — \(updater.hasUpdate ? L10n.text(.updateAvailable) : model.status)")
         }
         .menuBarExtraStyle(.window)
     }
@@ -478,7 +492,7 @@ struct KMSAApplication: App {
 
 enum MenuBarIcon {
     // macOS renders its black shapes in the appropriate color for light/dark menu bars.
-    static func image(active: Bool) -> NSImage {
+    static func image(active: Bool, updateAvailable: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: 22, height: 20), flipped: false) { _ in
             let symbol = NSImage(systemSymbolName: "hifispeaker.fill",
                                  accessibilityDescription: nil)!
@@ -499,6 +513,18 @@ enum MenuBarIcon {
                 slash.lineWidth = 1.6
                 slash.stroke()
             }
+            if updateAvailable {
+                // A template dot adapts to light/dark menu bars. Its transparent
+                // halo keeps it separate from the speaker and paused-state slash.
+                let halo = NSBezierPath(ovalIn: NSRect(x: 14.5, y: 13.5, width: 7, height: 7))
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current?.compositingOperation = .copy
+                NSColor.clear.setFill()
+                halo.fill()
+                NSGraphicsContext.restoreGraphicsState()
+                NSColor.black.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 16, y: 15, width: 4, height: 4)).fill()
+            }
             return true
         }
         image.isTemplate = true
@@ -508,6 +534,7 @@ enum MenuBarIcon {
 
 struct ControlPanel: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var updater: UpdateModel
     @State private var showingSmartModeHelp = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -589,23 +616,61 @@ struct ControlPanel: View {
                 Text(L10n.text(.noJack))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
-            Divider()
-            HStack {
-                Text("KMSA · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")").font(.caption2).foregroundStyle(.secondary)
-                Spacer()
-                Link("GitHub", destination: AppLinks.repository)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .buttonStyle(.plain)
-                    .help(L10n.text(.githubRepository))
-                    .accessibilityLabel(L10n.text(.githubRepository))
-                Button(L10n.text(.quit)) { model.stop(); NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
+            VStack(spacing: 8) {
+                Divider()
+                UpdateControl(updater: updater) {
+                    Task { await updater.check { model.stop() } }
+                }
+                HStack(spacing: 6) {
+                    Text("KMSA · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")").font(.caption2).foregroundStyle(.secondary)
+                    Text("•")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Link(destination: AppLinks.repository) {
+                        HStack(spacing: 3) {
+                            Text("GitHub")
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .medium))
+                                .accessibilityHidden(true)
+                        }
+                    }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .buttonStyle(.plain)
+                        .help(L10n.text(.githubRepository))
+                        .accessibilityLabel(L10n.text(.githubRepository))
+                    Spacer(minLength: 0)
+                    Button(L10n.text(.quit)) { model.stop(); NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
+                }
             }
         }
         .foregroundStyle(anthracite)
         .padding(20).frame(width: 355)
+        .background(PanelCorners())
     }
 
+}
+
+// Clip the existing AppKit panel surface, retaining its system material and shadow.
+// The frame view owns the complete surface; clipping only SwiftUI content would
+// leave the original window background visible behind the rounder corners.
+private struct PanelCorners: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { CornerView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class CornerView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window, let surface = window.contentView?.superview else { return }
+            window.isOpaque = false
+            surface.wantsLayer = true
+            surface.layer?.cornerRadius = 20
+            surface.layer?.cornerCurve = .continuous
+            surface.layer?.masksToBounds = true
+            window.invalidateShadow()
+        }
+    }
 }
 
 struct SmartModeHelp: View {

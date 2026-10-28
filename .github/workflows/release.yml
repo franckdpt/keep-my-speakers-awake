@@ -24,7 +24,9 @@ jobs:
       - run: npm run check:native
       - run: npm run build
       - name: Verify native bundle without audio playback
-        run: '"output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --self-check'
+        run: |
+          "output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --self-check
+          "output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --update-self-check
       - name: Prepare isolated DMG layout tools
         if: startsWith(github.ref, 'refs/tags/v')
         run: |

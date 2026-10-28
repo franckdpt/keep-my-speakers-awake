@@ -2,7 +2,9 @@
 
 A standalone menu bar app for macOS 14.2 or later. It does not need Chrome, a
 browser extension, a server, a microphone recording permission, or an account.
-It makes no network requests and never changes the Mac's volume or chosen output.
+It never changes the Mac's volume or chosen output. Speaker wake-ups work offline.
+Update checks contact GitHub at app startup and every 24 hours while the app runs;
+downloads/installations require a click. There is no account, telemetry or upload.
 
 Version 1.1.0 adds camera-activity protection, blocks manual tests while smart
 capture protection is active, and adds a persistent manual **Pause visio**.
@@ -123,6 +125,59 @@ diagnostics and a **Show logs / Afficher les logs** footer button.
 
 Version 1.6.6 replaces the log-access button with a GitHub link for stars, issues
 and source code, and follows the repository rename to `keep-my-speakers-awake`.
+
+Version 1.6.8 renames the slider to **Puissance du réveil / Wake-up strength**,
+places **• GitHub ↗** directly after the version, and rounds the menu-bar panel
+to a continuous 20-point corner while retaining the native material and shadow.
+
+Version 1.7.0 adds **Rechercher une mise à jour… / Check for Updates…**. When a
+new stable GitHub release is available, **Installer et relancer / Install and
+Relaunch** downloads, verifies and replaces the app in its current Applications
+folder. Saved settings and the bundle identifier stay unchanged.
+
+Version 1.7.1 checks for updates at startup (including login when Open at login is
+enabled), then every 24 hours. A small menu-bar speaker badge indicates an
+available update. The panel explicitly confirms when KMSA is up to date.
+
+Version 1.7.2 uses one compact, fixed-height footer slot: **Chercher une mise à
+jour / Check for Updates**, **Mettre à jour vers x.x.x / Update to x.x.x**, real
+download progress, then **KMSA est à jour / KMSA is up to date**. Clicking the
+versioned update button starts installation directly. Verification and restart
+use an indeterminate bar. A recent successful-install receipt preserves the
+completion message after relaunch and schedules the next check for 24 hours later.
+
+## In-app updates
+
+Update checks run at app startup and every 24 hours, with a manual check available
+at any time. Sleep/session-return notifications run a due check; repeated
+notifications do not duplicate requests. A failed check retries after one hour,
+keeps any previously detected update badge and never claims the app is up to date.
+The app owns the updater even while the panel is closed. Automatic checks show no
+modal alerts and never install updates. The updater uses the public GitHub API without a token,
+rejects drafts/prereleases/downgrades and requires both a newer semantic version
+and a higher build. It validates the manifest and archive against GitHub's SHA-256
+asset digests, then checks macOS compatibility, bundle identity, version/build,
+ad-hoc code-signature integrity, arm64 architecture and the unchanged wake signal.
+This trusts HTTPS and the official GitHub release account; the current release
+format does not provide a separate developer signing key or Apple notarization.
+
+The app must run from `/Applications/Keep My Speakers Awake.app` or the same name
+under `~/Applications`, with write access to that folder. Read-only DMGs and
+translocated apps are refused. No elevated helper or security-setting changes are
+used. A bundled, signed helper waits for the app to exit, revalidates the candidate,
+and replaces it using same-volume directory moves. It restores the previous app if
+verification/replacement fails, then relaunches. The previous bundle remains in a
+private `.kmsa-update-*` sibling folder as a recovery copy. The saved Auto, strength,
+Smart Mode and login settings are never rewritten by the updater.
+
+The existing tag/release workflow already supplies the required fixed-name DMG,
+`release-manifest.json` and GitHub digests. No extra feed, signing secret or hosted
+service is needed. Verify a real release without installing or playing audio:
+
+```sh
+"output/native/Keep My Speakers Awake.app/Contents/Helpers/KMSAUpdateInstaller" \
+  --verify-latest signals/sub2.wav
+```
 
 ## Build and open
 

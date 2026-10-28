@@ -38,6 +38,7 @@ npm test
 npm run check:native
 npm run build
 "output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --self-check
+"output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --update-self-check
 python3 -m venv output/dmg-tools
 output/dmg-tools/bin/python -m pip install -r scripts/dmg-requirements.txt
 export KMSA_DMG_PYTHON="$PWD/output/dmg-tools/bin/python"
@@ -51,14 +52,21 @@ Applications shortcut. Outputs are in `output/releases/`.
 
 ## Publish a version
 
+From 1.7.0, users can choose **Check for Updates…** in the app, then **Install and
+Relaunch**. It uses the official GitHub release DMG and manifest, verifies their
+SHA-256 digests and app contents, and retains a recovery copy of the previous app.
+From 1.7.1, checks also run at app startup and every 24 hours, with a small menu-bar
+badge when an update is available and a clear up-to-date message otherwise.
+Installation still requires a click. No extra update feed or credentials are needed.
+
 1. Update **`version.json`**: increase `version` and `build`. This is the source of
    truth for the app bundle and menu-bar version label.
 2. Optionally add release notes in `release-notes/<version>.md`, then commit and push the app changes to `main`.
 3. Push the matching tag, for example:
 
    ```sh
-   git tag v1.6.8
-   git push origin v1.6.8
+   git tag v1.7.3
+   git push origin v1.7.3
    ```
 
 GitHub Actions builds on an Apple Silicon runner, runs the checks and creates

@@ -38,6 +38,9 @@ public enum AppText: String, CaseIterable {
     case noJack
     case quit
     case githubRepository
+    case checkUpdates, checkingUpdates, appUpToDate, updateAvailable, updateExplanation
+    case installAndRelaunch, installUpdate, updateToVersion, automaticUpdateChecks, later, downloadingUpdate, verifyingUpdate, installingUpdate, updateFailed
+    case updateInstallLocation, updateNeedsNewerMacOS, updateVerificationFailed, updateCheckFailed
     case paused
     case wakePlaying
     case ready
@@ -71,7 +74,7 @@ public enum AppText: String, CaseIterable {
         switch self {
         case .subtitle: copy = ("Gardez vos enceintes éveillées", "Keep your speakers awake")
         case .enableApp: copy = ("Activer Keep My Speakers Awake", "Enable Keep My Speakers Awake")
-        case .wakeVolume: copy = ("Volume du réveil", "Wake-up volume")
+        case .wakeVolume: copy = ("Puissance du réveil", "Wake-up strength")
         case .testWake: copy = ("Tester le réveil", "Test wake-up")
         case .stopTest: copy = ("Arrêter le test", "Stop test")
         case .smartMode: copy = ("Mode intelligent", "Smart mode")
@@ -82,6 +85,24 @@ public enum AppText: String, CaseIterable {
         case .openAtLogin: copy = ("Ouvrir avec la session", "Open at login")
         case .noJack: copy = ("Pas de connexion jack détectée", "No jack connection detected")
         case .githubRepository: copy = ("GitHub : étoiles, questions et signalements", "GitHub: stars, issues and source code")
+        case .checkUpdates: copy = ("Chercher une mise à jour", "Check for Updates")
+        case .checkingUpdates: copy = ("Recherche en cours…", "Checking for updates…")
+        case .appUpToDate: copy = ("KMSA est à jour", "KMSA is up to date")
+        case .updateAvailable: copy = ("Une mise à jour est disponible", "An update is available")
+        case .updateExplanation: copy = ("La nouvelle version sera téléchargée depuis le dépôt GitHub officiel, vérifiée, puis installée. L’app redémarrera et tes réglages seront conservés.", "The new version will be downloaded from the official GitHub repository, verified and installed. The app will restart and your settings will be preserved.")
+        case .installAndRelaunch: copy = ("Installer et relancer", "Install and Relaunch")
+        case .installUpdate: copy = ("Installer la mise à jour…", "Install Update…")
+        case .updateToVersion: copy = ("Mettre à jour vers", "Update to")
+        case .automaticUpdateChecks: copy = ("Vérification au démarrage, puis toutes les 24 h.", "Checked at startup, then every 24 hours.")
+        case .later: copy = ("Plus tard", "Later")
+        case .downloadingUpdate: copy = ("Téléchargement…", "Downloading…")
+        case .verifyingUpdate: copy = ("Vérification…", "Verifying…")
+        case .installingUpdate: copy = ("Préparation du redémarrage…", "Preparing to restart…")
+        case .updateFailed: copy = ("La mise à jour n’a pas pu être terminée.", "The update could not be completed.")
+        case .updateInstallLocation: copy = ("Place KMSA dans un dossier Applications où tu peux modifier l’app, puis réessaie.", "Move KMSA to an Applications folder where you can modify the app, then try again.")
+        case .updateNeedsNewerMacOS: copy = ("Cette mise à jour nécessite une version plus récente de macOS.", "This update requires a newer version of macOS.")
+        case .updateVerificationFailed: copy = ("La vérification de la mise à jour a échoué. L’app actuelle est conservée.", "Update verification failed. The current app has been kept.")
+        case .updateCheckFailed: copy = ("Impossible de rechercher la mise à jour. Vérifie la connexion et réessaie.", "Could not check for updates. Check your connection and try again.")
         case .quit: copy = ("Quitter", "Quit")
         case .paused: copy = ("En pause", "Paused")
         case .wakePlaying: copy = ("Réveil en cours…", "Wake-up in progress…")

@@ -39,10 +39,16 @@ for (const profile of activeProfiles) {
 }
 await writeFile(join(resources, "profiles.json"), JSON.stringify(profiles, null, 2) + "\n");
 run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--product", "KMSA"]);
+run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--product", "KMSAUpdateInstaller"]);
 const binaries = run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--show-bin-path"], true);
 const macOS = join(app, "Contents/MacOS");
 const bundled = join(app, "Contents/Resources");
 await mkdir(macOS, { recursive: true });
+const helpers = join(app, "Contents/Helpers");
+await mkdir(helpers, { recursive: true });
+await copyFile(join(binaries, "KMSAUpdateInstaller"), join(helpers, "KMSAUpdateInstaller"));
+run("chmod", ["+x", join(helpers, "KMSAUpdateInstaller")]);
+run("codesign", ["--force", "--sign", "-", join(helpers, "KMSAUpdateInstaller")]);
 await mkdir(join(bundled, "Signals"), { recursive: true });
 await copyFile(join(binaries, "KMSA"), join(macOS, "KMSA"));
 for (const file of await readdir(resources)) {

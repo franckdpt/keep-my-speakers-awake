@@ -209,6 +209,7 @@ enum PolicyChecks {
         expectEqual(classify(kAudioDeviceTransportTypeBluetooth, UInt32(OUTPUT_HEADPHONES)), false)
         expectEqual(classify(kAudioDeviceTransportTypeHDMI, kAudioStreamTerminalTypeLine), false)
         expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeDigitalAudioInterface), false)
-        print("Passed \(checkCount) native policy, output-classification and localization checks.")
+        let updateChecks = runUpdateChecks()
+        print("Passed \(checkCount + updateChecks) native policy, output-classification, localization and update checks (\(updateChecks) update checks). No audio played.")
     }
 }

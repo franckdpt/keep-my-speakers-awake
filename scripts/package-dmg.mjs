@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,8 @@ import { ASSET_NAME, readVersion, validateTag } from './release-contract.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const run = (cmd, args) => execFileSync(cmd, args, {cwd: root, encoding:'utf8'}).trim();
 const version = readVersion();
+const dmgPython = process.env.KMSA_DMG_PYTHON || 'python3';
+run(dmgPython, ['-c', 'import dmgbuild, ds_store']);
 if (process.env.KMSA_EXPECTED_TAG) validateTag(process.env.KMSA_EXPECTED_TAG, version.version);
 if (run('git', ['status','--porcelain','--untracked-files=normal'])) throw new Error('Commit source changes before packaging a release.');
 const revision = run('git', ['rev-parse','HEAD']);
@@ -38,14 +40,18 @@ try {
   if (run('lipo',[executable,'-archs']) !== 'arm64') throw new Error('The release must contain an arm64-only executable.');
   const signal = join(stagedApp,'Contents/Resources/Signals/sub2.wav');
   if (await sha256(signal) !== await sha256(join(root,'signals/sub2.wav'))) throw new Error('Packaged audio differs from source.');
-  await symlink('/Applications',join(contents,'Applications'));
   const dmg = join(destination,ASSET_NAME);
-  run('hdiutil',['create','-ov','-format','UDZO','-volname','Keep My Speakers Awake','-srcfolder',contents,dmg]);
+  run('swift', [join(root,'scripts/dmg-background.swift'), staging]);
+  await rm(dmg, {force:true});
+  run(dmgPython, ['-m','dmgbuild','-s',join(root,'scripts/dmg-settings.py'),
+    '-D',`app=${stagedApp}`,'-D',`background=${join(staging,'background.png')}`,
+    'Keep My Speakers Awake',dmg]);
   run('hdiutil',['verify',dmg]);
   await mkdir(mount);
   run('hdiutil',['attach','-readonly','-nobrowse','-mountpoint',mount,dmg]);
   mounted = true;
   const mountedApp = join(mount,appName);
+  run(dmgPython, [join(root,'scripts/verify-dmg-layout.py'), mount]);
   run('codesign',['--verify','--deep','--strict',mountedApp]);
   if (plist(mountedApp,'CFBundleShortVersionString') !== version.version ||
       await sha256(join(mountedApp,'Contents/MacOS/KMSA')) !== await sha256(executable)) {

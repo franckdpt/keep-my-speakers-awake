@@ -41,6 +41,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #0071e3; outline-offs
   text-decoration: none;
 }
 .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #51c75c; }
+.header-links { display: flex; align-items: center; gap: 20px; }
+.github-link { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--secondary); font-size: 12px; text-decoration: none; }
+.github-link:hover { color: #1d1d1f; }
 .language-switch { display: flex; align-items: center; gap: 0; color: var(--secondary); font-size: 12px; }
 .language-switch a {
   display: inline-flex;
@@ -89,7 +92,7 @@ h1 {
 }
 .speakers {
   width: min(620px, 70vw);
-  height: clamp(160px, calc(100svh - 530px), 380px);
+  height: clamp(140px, calc(100svh - 565px), 380px);
   margin: 32px 0 0;
 }
 .speakers img { width: 100%; height: 100%; object-fit: contain; display: block; }
@@ -118,13 +121,14 @@ h1 {
 .download:active { background: #000; }
 .requirements { margin: 14px 0 0; color: var(--secondary); font-size: 14px; line-height: 1.5; }
 .requirements span { padding: 0 3px; }
+.install-hint { margin: 8px 0 0; max-width: 100%; color: var(--secondary); font-size: 14px; line-height: 1.5; text-align: center; text-wrap: balance; }
 
 @media (min-width: 701px) and (max-height: 760px) {
   .site-header { min-height: 76px; padding-block: 14px; }
   .hero { padding-block: 16px 28px; }
   h1 { font-size: clamp(40px, 4vw, 52px); }
   .tagline { font-size: 19px; margin-top: 12px; }
-  .speakers { height: clamp(150px, calc(100svh - 380px), 320px); margin-top: 24px; }
+  .speakers { height: clamp(120px, calc(100svh - 415px), 320px); margin-top: 24px; }
   .actions { margin-top: 24px; }
 }
 
@@ -135,7 +139,7 @@ h1 {
   .hero { padding: 24px 24px 40px; }
   h1 { max-width: 18ch; font-size: clamp(34px, 9.7vw, 44px); line-height: 1.1; letter-spacing: -.03em; }
   .tagline { max-width: 320px; margin-top: 16px; font-size: 17px; line-height: 1.5; letter-spacing: 0; }
-  .speakers { width: min(440px, 92vw); height: clamp(170px, 30svh, 290px); margin-top: 32px; }
+  .speakers { width: min(440px, 92vw); height: clamp(150px, 26svh, 260px); margin-top: 28px; }
   .actions { width: 100%; margin-top: 32px; }
   .download { min-width: 248px; min-height: 50px; font-size: 17px; }
   .requirements { font-size: 14px; }
@@ -143,10 +147,10 @@ h1 {
 
 @media (max-width: 700px) and (max-height: 700px) {
   .site-header { min-height: 64px; padding-block: 8px; }
-  .hero { padding-block: 16px 28px; }
+  .hero { padding-block: 8px 16px; }
   .tagline { margin-top: 12px; }
-  .speakers { height: clamp(140px, calc(100svh - 420px), 200px); margin-top: 24px; }
-  .actions { margin-top: 24px; }
+  .speakers { height: clamp(80px, calc(100svh - 485px), 180px); margin-top: 16px; }
+  .actions { margin-top: 16px; }
   .requirements { margin-top: 12px; }
 }
 

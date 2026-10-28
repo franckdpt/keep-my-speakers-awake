@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DOWNLOAD_URL } from './download.js';
+import { DOWNLOAD_URL, REPOSITORY_URL } from './download.js';
 import { SEO } from './seo.js';
 
 const basePath = import.meta.env.BASE_URL;
@@ -11,6 +11,8 @@ const copy = {
     download: 'Download for Mac',
     speakersAlt: 'A Focal studio monitor and a KRK studio monitor with its yellow speaker cone.',
     language: 'Choose language',
+    github: 'GitHub — star the project or open an issue',
+    install: 'Open the DMG. Drag the app to Applications.',
   },
   fr: {
     title: 'Gardez vos enceintes éveillées.',
@@ -18,6 +20,8 @@ const copy = {
     download: 'Télécharger pour Mac',
     speakersAlt: 'Une enceinte de monitoring Focal et une enceinte KRK avec son haut-parleur jaune.',
     language: 'Choisir la langue',
+    github: 'GitHub — mettre une étoile ou ouvrir une issue',
+    install: 'Ouvrez le DMG. Glissez l’app dans Applications.',
   },
 };
 
@@ -51,11 +55,14 @@ export function App({ initialLanguage: seedLanguage = 'en', autoDetect = true })
     <div className="landing">
       <header className="site-header">
         <a className="wordmark" href={basePath} aria-label="Keep My Speakers Awake">KMSA<span className="status-dot" aria-hidden="true" /></a>
+        <div className="header-links">
+        <a className="github-link" href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer" aria-label={text.github} title={text.github}>GitHub <span aria-hidden="true">↗</span></a>
         <nav className="language-switch" aria-label={text.language}>
           <a href={basePath} lang="en" aria-label="English" aria-current={language === 'en' ? 'page' : undefined} onClick={() => rememberLanguage('en')}>EN</a>
           <span aria-hidden="true">/</span>
           <a href={`${basePath}fr/`} lang="fr" aria-label="Français" aria-current={language === 'fr' ? 'page' : undefined} onClick={() => rememberLanguage('fr')}>FR</a>
         </nav>
+        </div>
       </header>
       <main className="hero">
         <div className="hero-copy">
@@ -71,6 +78,7 @@ export function App({ initialLanguage: seedLanguage = 'en', autoDetect = true })
         <div className="actions">
           <a className="download" href={DOWNLOAD_URL}>{text.download}</a>
           <p className="requirements">Apple Silicon <span aria-hidden="true">·</span> macOS 14.2+</p>
+          <p className="install-hint">{text.install}</p>
         </div>
       </main>
     </div>

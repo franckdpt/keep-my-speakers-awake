@@ -11,6 +11,8 @@ before signals. Speaker wake-up effectiveness depends on the hardware.
 
 Open the DMG and drag **Keep My Speakers Awake.app** to Applications. Current
 releases use a local ad-hoc signature and are **not Apple notarized**.
+The DMG opens in icon view with an app → Applications layout and bilingual
+instructions. Then open the copied app from Applications.
 
 ## Build
 
@@ -21,12 +23,16 @@ npm test
 npm run check:native
 npm run build
 "output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --self-check
+python3 -m venv output/dmg-tools
+output/dmg-tools/bin/python -m pip install -r scripts/dmg-requirements.txt
+export KMSA_DMG_PYTHON="$PWD/output/dmg-tools/bin/python"
 npm run package:dmg
 ```
 
 The checks do not play audio. Packaging verifies version/build, minimum macOS,
 arm64-only architecture, signature, audio bytes, DMG integrity and the executable
-mounted from the DMG. Outputs are in `output/releases/`.
+mounted from the DMG, plus Finder's saved icon positions, background and
+Applications shortcut. Outputs are in `output/releases/`.
 
 ## Publish a version
 
@@ -36,8 +42,8 @@ mounted from the DMG. Outputs are in `output/releases/`.
 3. Push the matching tag, for example:
 
    ```sh
-   git tag v1.6.7
-   git push origin v1.6.7
+   git tag v1.6.8
+   git push origin v1.6.8
    ```
 
 GitHub Actions builds on an Apple Silicon runner, runs the checks and creates

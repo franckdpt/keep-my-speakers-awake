@@ -12,7 +12,6 @@ const copy = {
     speakersAlt: 'A Focal studio monitor and a KRK studio monitor with its yellow speaker cone.',
     language: 'Choose language',
     github: 'GitHub — star the project or open an issue',
-    install: 'Open the DMG. Drag the app to Applications.',
   },
   fr: {
     title: 'Gardez vos enceintes éveillées.',
@@ -21,7 +20,6 @@ const copy = {
     speakersAlt: 'Une enceinte de monitoring Focal et une enceinte KRK avec son haut-parleur jaune.',
     language: 'Choisir la langue',
     github: 'GitHub — mettre une étoile ou ouvrir une issue',
-    install: 'Ouvrez le DMG. Glissez l’app dans Applications.',
   },
 };
 
@@ -78,7 +76,6 @@ export function App({ initialLanguage: seedLanguage = 'en', autoDetect = true })
         <div className="actions">
           <a className="download" href={DOWNLOAD_URL}>{text.download}</a>
           <p className="requirements">Apple Silicon <span aria-hidden="true">·</span> macOS 14.2+</p>
-          <p className="install-hint">{text.install}</p>
         </div>
       </main>
     </div>

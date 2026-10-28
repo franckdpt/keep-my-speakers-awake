@@ -14,6 +14,21 @@ releases use a local ad-hoc signature and are **not Apple notarized**.
 The DMG opens in icon view with an app → Applications layout and bilingual
 instructions. Then open the copied app from Applications.
 
+### First launch on macOS
+
+The current release is not notarized. macOS can block its first launch with
+“Apple could not verify this app is free of malware”. If you downloaded the
+official release here and choose to open it:
+
+1. Copy the app to Applications, try opening it, then dismiss the alert with **Done**.
+2. Open **System Settings → Privacy & Security → Open Anyway** for Keep My Speakers Awake.
+3. Confirm the request and open the app again.
+
+In French: **Terminé**, puis **Réglages Système → Confidentialité et sécurité → Ouvrir quand même**.
+See [Apple's first-launch instructions](https://support.apple.com/102445).
+Signing with Developer ID and notarizing the app is required to remove this
+unverified-app block for users. The drag-to-Applications layout alone does not do this.
+
 ## Build
 
 Requires a Mac, Apple's Command Line Tools and Node.js 24+. No paid dependencies.

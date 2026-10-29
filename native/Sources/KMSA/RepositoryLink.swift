@@ -2,19 +2,35 @@ import AppKit
 import SwiftUI
 import KMSACore
 
-struct RepositoryLink: NSViewRepresentable {
+struct RepositoryLink: View {
     var openRepository: () -> Void = { NSWorkspace.shared.open(AppLinks.repository) }
 
-    func makeNSView(context: Context) -> LinkButton {
-        let button = LinkButton()
-        updateNSView(button, context: context)
-        return button
+    var body: some View {
+        HStack(spacing: 3) {
+            Text("GitHub").accessibilityHidden(true)
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 8, weight: .medium))
+                .accessibilityHidden(true)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .overlay { NativeLink(openRepository: openRepository) }
     }
 
-    func updateNSView(_ button: LinkButton, context: Context) {
-        button.openRepository = openRepository
-        button.toolTip = L10n.text(.githubRepository)
-        button.setAccessibilityLabel(L10n.text(.githubRepository))
+    private struct NativeLink: NSViewRepresentable {
+        let openRepository: () -> Void
+
+        func makeNSView(context: Context) -> LinkButton {
+            let button = LinkButton()
+            updateNSView(button, context: context)
+            return button
+        }
+
+        func updateNSView(_ button: LinkButton, context: Context) {
+            button.openRepository = openRepository
+            button.toolTip = L10n.text(.githubRepository)
+            button.setAccessibilityLabel(L10n.text(.githubRepository))
+        }
     }
 
     final class LinkButton: NSButton {
@@ -24,22 +40,15 @@ struct RepositoryLink: NSViewRepresentable {
 
         init() {
             super.init(frame: .zero)
-            title = "GitHub"
-            font = .systemFont(ofSize: 11)
-            image = NSImage(systemSymbolName: "arrow.up.right", accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: 8, weight: .medium))
-            imagePosition = .imageTrailing
-            imageHugsTitle = true
-            contentTintColor = .secondaryLabelColor
+            // SwiftUI draws the label with the same style as the version text.
+            // This transparent overlay retains native hover/click handling.
+            title = ""
             isBordered = false
-            bezelStyle = .inline
             setButtonType(.momentaryPushIn)
+            isTransparent = true
             target = self
             action = #selector(openLink)
             setAccessibilityRole(.link)
-            attributedTitle = NSAttributedString(string: title, attributes: [
-                .font: font!, .foregroundColor: NSColor.secondaryLabelColor,
-            ])
         }
 
         required init?(coder: NSCoder) { fatalError("init(coder:) is unsupported") }
@@ -119,6 +128,8 @@ struct RepositoryLink: NSViewRepresentable {
             panel.setContentSize(host.fittingSize)
             host.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            precondition(button.bounds.width >= 40 && button.bounds.height >= 10,
+                         "The native target must cover the full GitHub label and arrow")
             for x in [2.0, button.bounds.midX, button.bounds.maxX - 2] {
                 let point = button.convert(NSPoint(x: x, y: button.bounds.midY), to: host.superview)
                 let hit = host.hitTest(point)

@@ -169,6 +169,9 @@ Version 1.7.9 uses a native GitHub link button that owns both click and hover
 events. It restores the hand cursor on mouse movement, including in an inactive
 menu-bar panel, and resets the cursor when leaving or removing the link.
 
+Version 1.7.10 renders the GitHub label with the same SwiftUI caption size and
+secondary color as the adjacent KMSA version, retaining native hover and clicks.
+
 ## In-app updates
 
 Update checks run at app startup and every 12 hours, with a manual check available

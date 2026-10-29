@@ -95,6 +95,7 @@ enum EntryPoint {
             return
         }
         if CommandLine.arguments.contains("--self-check") {
+            PanelCorners.runChecks()
             AppModel.runCountdownChecks()
             let suite = "fr.franckdupont.kmsa.check.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suite)!
@@ -649,6 +650,7 @@ struct ControlPanel: View {
         }
         .foregroundStyle(anthracite)
         .padding(20).frame(width: 355)
+        .fixedSize(horizontal: false, vertical: true)
         .background(PanelCorners())
     }
 
@@ -661,9 +663,66 @@ private struct PanelCorners: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { CornerView() }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
+    static func runChecks() {
+        _ = NSApplication.shared
+        guard let screen = NSScreen.main else { return }
+        // Never order the test panel on screen or touch the running app's window.
+        let panel = NSPanel(contentRect: NSRect(x: screen.visibleFrame.minX + 20,
+                                               y: screen.visibleFrame.minY + 20,
+                                               width: 355, height: 180),
+                            styleMask: .borderless, backing: .buffered, defer: false, screen: screen)
+        panel.contentView = CornerView()
+        let x = panel.frame.minX
+        for height in [180.0, 320.0, 180.0] {
+            var frame = panel.frame
+            frame.origin.y -= (height - frame.height) / 2
+            frame.size.height = height
+            panel.setFrame(frame, display: false)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            let expectedTop = min(screen.visibleFrame.maxY,
+                                  screen.frame.maxY - NSStatusBar.system.thickness) - 6
+            precondition(abs(panel.frame.maxY - expectedTop) <= 0.5)
+            precondition(panel.frame.minX == x)
+        }
+        panel.contentView = nil
+        print("Panel layout: compact/expanded/compact resizes stay below the menu bar without horizontal drift. Test window never shown; no audio played.")
+    }
+
     private final class CornerView: NSView {
+        private var observers: [NSObjectProtocol] = []
+        private var layoutScheduled = false
+
+        deinit {
+            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+            observers.removeAll()
+            guard let window else { return }
+            for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification,
+                         NSWindow.didChangeScreenNotification, NSWindow.didBecomeKeyNotification] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    self?.scheduleLayout()
+                })
+            }
+            scheduleLayout()
+        }
+
+        private func scheduleLayout() {
+            guard !layoutScheduled else { return }
+            layoutScheduled = true
+            // MenuBarExtra can recenter a shorter panel after the jack controls
+            // disappear. Wait for its layout, then keep the top below the menu bar.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.layoutScheduled = false
+                self.updateWindow()
+            }
+        }
+
+        private func updateWindow() {
             guard let window, let surface = window.contentView?.superview else { return }
             window.isOpaque = false
             surface.wantsLayer = true
@@ -671,6 +730,13 @@ private struct PanelCorners: NSViewRepresentable {
             surface.layer?.cornerCurve = .continuous
             surface.layer?.masksToBounds = true
             window.invalidateShadow()
+            guard let screen = window.screen else { return }
+            let menuBarBottom = min(screen.visibleFrame.maxY,
+                                    screen.frame.maxY - NSStatusBar.system.thickness)
+            let originY = menuBarBottom - 6 - window.frame.height
+            if abs(window.frame.minY - originY) > 0.5 {
+                window.setFrameOrigin(NSPoint(x: window.frame.minX, y: originY))
+            }
         }
     }
 }

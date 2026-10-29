@@ -159,6 +159,10 @@ Stop test**, based on the player's actual position. The up-to-date checkmark is
 green. Silent update checks run every 12 hours; the confirmation message still
 has an independent 24-hour lifetime.
 
+Version 1.7.7 keeps the panel's top six points below the menu bar when its
+content height changes, including after disconnecting the jack. The panel uses
+its content's natural height instead of retaining extra vertical space.
+
 ## In-app updates
 
 Update checks run at app startup and every 12 hours, with a manual check available

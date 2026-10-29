@@ -163,6 +163,8 @@ Version 1.7.7 keeps the panel's top six points below the menu bar when its
 content height changes, including after disconnecting the jack. The panel uses
 its content's natural height instead of retaining extra vertical space.
 
+Version 1.7.8 shows the pointing-hand cursor over the panel's GitHub link.
+
 ## In-app updates
 
 Update checks run at app startup and every 12 hours, with a manual check available

@@ -641,6 +641,7 @@ struct ControlPanel: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .buttonStyle(.plain)
+                        .background(LinkCursor())
                         .help(L10n.text(.githubRepository))
                         .accessibilityLabel(L10n.text(.githubRepository))
                     Spacer(minLength: 0)
@@ -654,6 +655,21 @@ struct ControlPanel: View {
         .background(PanelCorners())
     }
 
+}
+
+private struct LinkCursor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { CursorView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class CursorView: NSView {
+        override func resetCursorRects() {
+            super.resetCursorRects()
+            addCursorRect(bounds, cursor: .pointingHand)
+        }
+
+        // The underlying SwiftUI Link continues to handle clicks.
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
 }
 
 // Clip the existing AppKit panel surface, retaining its system material and shadow.

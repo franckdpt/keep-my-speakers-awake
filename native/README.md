@@ -165,6 +165,10 @@ its content's natural height instead of retaining extra vertical space.
 
 Version 1.7.8 shows the pointing-hand cursor over the panel's GitHub link.
 
+Version 1.7.9 uses a native GitHub link button that owns both click and hover
+events. It restores the hand cursor on mouse movement, including in an inactive
+menu-bar panel, and resets the cursor when leaving or removing the link.
+
 ## In-app updates
 
 Update checks run at app startup and every 12 hours, with a manual check available

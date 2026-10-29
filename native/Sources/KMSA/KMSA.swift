@@ -95,6 +95,7 @@ enum EntryPoint {
             return
         }
         if CommandLine.arguments.contains("--self-check") {
+            RepositoryLink.runChecks()
             PanelCorners.runChecks()
             AppModel.runCountdownChecks()
             let suite = "fr.franckdupont.kmsa.check.\(UUID().uuidString)"
@@ -630,20 +631,7 @@ struct ControlPanel: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
-                    Link(destination: AppLinks.repository) {
-                        HStack(spacing: 3) {
-                            Text("GitHub")
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 8, weight: .medium))
-                                .accessibilityHidden(true)
-                        }
-                    }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .buttonStyle(.plain)
-                        .background(LinkCursor())
-                        .help(L10n.text(.githubRepository))
-                        .accessibilityLabel(L10n.text(.githubRepository))
+                    RepositoryLink().fixedSize()
                     Spacer(minLength: 0)
                     Button(L10n.text(.quit)) { model.stop(); NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
                 }
@@ -655,21 +643,6 @@ struct ControlPanel: View {
         .background(PanelCorners())
     }
 
-}
-
-private struct LinkCursor: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { CursorView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class CursorView: NSView {
-        override func resetCursorRects() {
-            super.resetCursorRects()
-            addCursorRect(bounds, cursor: .pointingHand)
-        }
-
-        // The underlying SwiftUI Link continues to handle clicks.
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    }
 }
 
 // Clip the existing AppKit panel surface, retaining its system material and shadow.

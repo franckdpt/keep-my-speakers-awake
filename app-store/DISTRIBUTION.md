@@ -73,6 +73,31 @@ then produces the signed Apple installer package in `output/app-store/`.
 Store-signed apps must be tested through Apple's distribution path (Transporter /
 TestFlight / App Store); the script does not bypass macOS's execution policy.
 
+For command-line uploads, use the official `altool` bundled with Transporter.
+An App Store Connect team API key with the Developer role can validate and upload
+the package. API activation, its terms and key creation require the account
+holder's authorization. Team keys cover every app in the account. Keep the
+private `.p8` outside the checkout, readable only by its owner, and include it
+only in the separately encrypted off-Mac backup. Never add it to GitHub.
+
+Set `KMSA_APPSTORE_KEY_ID`, `KMSA_APPSTORE_ISSUER_ID` and
+`KMSA_APPSTORE_PRIVATE_KEY` locally, then run:
+
+```sh
+"/Applications/Transporter.app/Contents/Frameworks/ContentDelivery.framework/Versions/A/Resources/altool" \
+  --validate-app output/app-store/Keep-My-Speakers-Awake.pkg \
+  --api-key "$KMSA_APPSTORE_KEY_ID" --api-issuer "$KMSA_APPSTORE_ISSUER_ID" \
+  --p8-file-path "$KMSA_APPSTORE_PRIVATE_KEY" --output-format json
+"/Applications/Transporter.app/Contents/Frameworks/ContentDelivery.framework/Versions/A/Resources/altool" \
+  --upload-package output/app-store/Keep-My-Speakers-Awake.pkg \
+  --api-key "$KMSA_APPSTORE_KEY_ID" --api-issuer "$KMSA_APPSTORE_ISSUER_ID" \
+  --p8-file-path "$KMSA_APPSTORE_PRIVATE_KEY" --wait --output-format json
+```
+
+Wait for successful Apple processing before selecting the build and submitting
+the version for App Review. The API key is separate from the `KMSA` notarization
+Keychain profile used for direct downloads.
+
 The `APP_STORE` compilation flag excludes the standalone updater and installer
 UI. No network or microphone/camera capture entitlement is requested. Audio
 activity and idle observations remain local; unknown activity still blocks

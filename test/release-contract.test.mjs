@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSET_NAME, LATEST_DOWNLOAD, readVersion, validateVersion, validateTag, compareVersions, validateManifest } from '../scripts/release-contract.mjs';
+import { ASSET_NAME, LATEST_DOWNLOAD, readVersion, validateVersion, validateTag, compareVersions, validateManifest, findRelease } from '../scripts/release-contract.mjs';
 import { DOWNLOAD_URL } from '../landing/src/download.js';
 
 test('only a matching stable tag may publish the built app', () => {
@@ -16,6 +16,14 @@ test('old releases never replace a newer latest version', () => {
   assert.equal(compareVersions('v1.6.5', '1.6.5'), 0);
   assert.equal(compareVersions('v2.0.0', 'v1.99.99'), 1);
   assert.throws(() => compareVersions('v1.6.5-beta', 'v1.6.5'));
+});
+
+test('unpublished drafts are reused even when release-by-tag returns 404',()=>{
+  const draft = {id:123,tag_name:'v1.7.11',draft:true};
+  const older = {id:122,tag_name:'v1.7.10',draft:false};
+  assert.equal(findRelease([draft,older],'v1.7.11'),draft);
+  assert.equal(findRelease([older],'v1.7.11'),null);
+  assert.throws(()=>findRelease([draft,{...draft,id:124}],'v1.7.11'));
 });
 
 test('the public download uses the stable GitHub latest-asset route', () => {

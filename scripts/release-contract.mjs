@@ -32,6 +32,14 @@ export function compareVersions(left, right) {
   return 0;
 }
 
+// GitHub's release-by-tag endpoint omits unpublished drafts. Match the full
+// release listing before creating a draft, and refuse ambiguous duplicates.
+export function findRelease(releases, tag) {
+  const matches = releases.filter(release => release.tag_name === tag);
+  if (matches.length > 1) throw new Error(`Multiple releases match ${tag}; resolve the duplicate drafts first.`);
+  return matches[0] ?? null;
+}
+
 export function validateManifest(manifest, version, revision) {
   if (manifest.version !== version.version || manifest.build !== version.build ||
       manifest.minimumMacOS !== version.minimumMacOS || manifest.architecture !== 'arm64' ||

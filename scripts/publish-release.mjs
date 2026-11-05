@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { ASSET_NAME, REPOSITORY, readVersion, validateTag, validateManifest, compareVersions } from './release-contract.mjs';
+import { ASSET_NAME, REPOSITORY, readVersion, validateTag, validateManifest, compareVersions, findRelease } from './release-contract.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const version = readVersion();
@@ -41,6 +41,10 @@ const changes = await readFile(new URL(`../release-notes/${version.version}.md`,
 });
 const notes = `${changes.trim()}\n\nNative menu bar app for Apple Silicon. Requires macOS ${version.minimumMacOS} or later.\n\nDownload **${ASSET_NAME}** below, open it and drag the app into Applications.\n\nSigned with Franck Dupont’s Apple Developer ID and notarized by Apple. The notarization tickets are stapled to the app and DMG.\n\nBuild ${version.build}; version and arm64 architecture verified from the app mounted from this DMG. SHA-256 and source revision are included in the attached manifest.\n`;
 let release = optionalGet(`repos/${repository}/releases/tags/${tag}`);
+if (!release) {
+  const pages = JSON.parse(gh(['api',`repos/${repository}/releases?per_page=100`,'--paginate','--slurp']));
+  release = findRelease(pages.flat(),tag);
+}
 if (release && !release.draft) throw new Error('This release is already published. Published assets are never replaced.');
 if (!release) release = api(`repos/${repository}/releases`,'POST',{
   tag_name:tag, name:`KMSA ${version.version}`, body:notes, draft:true, prerelease:false, make_latest:'false',

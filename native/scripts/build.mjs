@@ -1,16 +1,24 @@
 import { spawnSync } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { SIGNAL_PROFILES } from "../../lib/signal-profiles.js";
 import { readVersion } from "../../scripts/release-contract.mjs";
+import { distributionConfig, BUNDLE_ID, APPLE_TEAM_ID } from "../../scripts/distribution.mjs";
+import { prepareSwiftSources } from "../../scripts/swift-sources.mjs";
 
 const native = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const root = resolve(native, "..");
 const version = readVersion();
+const distribution = distributionConfig();
+if (distribution.appStore && distribution.signed && !process.env.KMSA_PROVISIONING_PROFILE) {
+  throw new Error('Signed App Store builds require KMSA_PROVISIONING_PROFILE.');
+}
+const swiftFlags = distribution.appStore ? ["-Xswiftc", "-DAPP_STORE"] : [];
+const buildPath = process.env.KMSA_SWIFT_BUILD_PATH || join(homedir(), "Library/Caches/KMSA", distribution.appStore ? "swift-app-store" : "swift-direct");
 const resources = join(native, "Sources/KMSA/Resources");
-const destination = join(root, "output/native");
+const destination = join(root, distribution.appStore ? "output/native-app-store" : "output/native");
 // Sign outside synced Documents: macOS's file provider can continually add FinderInfo to .app folders there.
 const staging = await mkdtemp(join(tmpdir(), "kmsa-build-"));
 const app = join(staging, "Keep My Speakers Awake.app");
@@ -22,6 +30,13 @@ function run(command, args, capture = false) {
   });
   if (result.error || result.status !== 0) throw result.error ?? new Error(`${command} failed: ${result.stderr ?? result.status}`);
   return result.stdout?.trim();
+}
+
+
+function sign(target, entitlements = null) {
+  run("codesign", ["--force", "--sign", distribution.identity,
+    ...(distribution.signed ? ["--timestamp", "--options", "runtime"] : []),
+    ...(entitlements ? ["--entitlements", entitlements] : []), target]);
 }
 
 await mkdir(resources, { recursive: true });
@@ -38,17 +53,20 @@ for (const profile of activeProfiles) {
   profiles.push({ id: profile.id, label: profile.label, file, hint: profile.hint ?? null });
 }
 await writeFile(join(resources, "profiles.json"), JSON.stringify(profiles, null, 2) + "\n");
-run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--product", "KMSA"]);
-run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--product", "KMSAUpdateInstaller"]);
-const binaries = run("xcrun", ["swift", "build", "--package-path", native, "--arch", "arm64", "-c", "release", "--show-bin-path"], true);
+const buildSource = await prepareSwiftSources(distribution.appStore ? 'app-store' : 'direct');
+run("xcrun", ["swift", "build", "--scratch-path", buildPath, "--package-path", buildSource, "--arch", "arm64", "-c", "release", "--product", "KMSA", ...swiftFlags]);
+if (!distribution.appStore) run("xcrun", ["swift", "build", "--scratch-path", buildPath, "--package-path", buildSource, "--arch", "arm64", "-c", "release", "--product", "KMSAUpdateInstaller"]);
+const binaries = run("xcrun", ["swift", "build", "--scratch-path", buildPath, "--package-path", buildSource, "--arch", "arm64", "-c", "release", "--show-bin-path"], true);
 const macOS = join(app, "Contents/MacOS");
 const bundled = join(app, "Contents/Resources");
 await mkdir(macOS, { recursive: true });
 const helpers = join(app, "Contents/Helpers");
+if (!distribution.appStore) {
 await mkdir(helpers, { recursive: true });
 await copyFile(join(binaries, "KMSAUpdateInstaller"), join(helpers, "KMSAUpdateInstaller"));
 run("chmod", ["+x", join(helpers, "KMSAUpdateInstaller")]);
-run("codesign", ["--force", "--sign", "-", join(helpers, "KMSAUpdateInstaller")]);
+sign(join(helpers, "KMSAUpdateInstaller"));
+}
 await mkdir(join(bundled, "Signals"), { recursive: true });
 await copyFile(join(binaries, "KMSA"), join(macOS, "KMSA"));
 for (const file of await readdir(resources)) {
@@ -58,7 +76,7 @@ await writeFile(join(app, "Contents/Info.plist"), `<?xml version="1.0" encoding=
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <!-- Stable identity preserves settings and login registration across the KMSA rename. -->
-<key>CFBundleIdentifier</key><string>fr.franckdupont.kmma.native</string>
+<key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
 <key>CFBundleName</key><string>Keep My Speakers Awake</string>
 <key>CFBundleDisplayName</key><string>Keep My Speakers Awake</string>
 <key>CFBundleExecutable</key><string>KMSA</string>
@@ -69,6 +87,9 @@ await writeFile(join(app, "Contents/Info.plist"), `<?xml version="1.0" encoding=
 <key>CFBundleLocalizations</key><array><string>en</string><string>fr</string></array>
 <key>CFBundleIconFile</key><string>AppIcon.icns</string>
 <key>LSMinimumSystemVersion</key><string>${version.minimumMacOS}</string>
+<key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+<key>ITSAppUsesNonExemptEncryption</key><false/>
+<key>KMSADistributionChannel</key><string>${distribution.channel}</string>
 <key>LSUIElement</key><true/>
 <key>LSMultipleInstancesProhibited</key><true/>
 <key>NSHighResolutionCapable</key><true/>
@@ -88,7 +109,29 @@ run("iconutil", ["-c", "icns", iconset, "-o", join(bundled, "AppIcon.icns")]);
 run("chmod", ["+x", join(macOS, "KMSA")]);
 // Finder/file-provider metadata on generated bundles can prevent local code signing.
 run("xattr", ["-cr", app]);
-run("codesign", ["--force", "--sign", "-", app]);
+await copyFile(join(native, "PrivacyInfo.xcprivacy"), join(bundled, "PrivacyInfo.xcprivacy"));
+if (distribution.appStore && process.env.KMSA_PROVISIONING_PROFILE) {
+  await copyFile(process.env.KMSA_PROVISIONING_PROFILE, join(app, "Contents/embedded.provisionprofile"));
+}
+let entitlementPath = distribution.appStore ? join(native, "AppStore.entitlements") : null;
+if (distribution.appStore && distribution.signed) {
+  const profileXML = run('security', ['cms', '-D', '-i', process.env.KMSA_PROVISIONING_PROFILE], true);
+  const profilePath = join(staging, 'profile.plist');
+  await writeFile(profilePath, profileXML);
+  const profileTeam = run('/usr/libexec/PlistBuddy', ['-c', 'Print :TeamIdentifier:0', profilePath], true);
+  const prefix = run('/usr/libexec/PlistBuddy', ['-c', 'Print :ApplicationIdentifierPrefix:0', profilePath], true);
+  const identifier = run('/usr/libexec/PlistBuddy', ['-c', 'Print :Entitlements:com.apple.application-identifier', profilePath], true);
+  if (profileTeam !== APPLE_TEAM_ID || identifier !== `${prefix}.${BUNDLE_ID}`) throw new Error('Provisioning profile is for a different team or app.');
+  entitlementPath = join(staging, 'AppStore.entitlements');
+  await copyFile(join(native, 'AppStore.entitlements'), entitlementPath);
+  for (const [key, value] of [['com.apple.application-identifier', identifier], ['com.apple.developer.team-identifier', APPLE_TEAM_ID]]) {
+    run('/usr/libexec/PlistBuddy', ['-c', `Add :${key} string ${value}`, entitlementPath]);
+  }
+}
+sign(app, entitlementPath);
+if (distribution.signed) {
+  run("codesign", ["--verify", "--strict", "-R", `=anchor apple generic and certificate leaf[subject.OU] = "${APPLE_TEAM_ID}"`, app]);
+}
 run("codesign", ["--verify", "--deep", "--strict", app]);
 run("plutil", ["-lint", join(app, "Contents/Info.plist")]);
 // Check that packaging did not change the audio already tested in the extension.

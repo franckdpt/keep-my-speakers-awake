@@ -1,3 +1,4 @@
+#if !APP_STORE
 import AppKit
 import KMSACore
 
@@ -11,6 +12,7 @@ final class UpdateModel: ObservableObject {
     @Published private(set) var confirmedCurrentAt: Date?
     var hasUpdate: Bool { availableUpdate != nil }
     var showsProgress: Bool { busy && foregroundAction }
+    var showsControl: Bool { hasUpdate || showsProgress }
     var isUpToDate: Bool {
         guard status == .appUpToDate, !hasUpdate, let confirmedCurrentAt else { return false }
         return Self.isFresh(confirmedCurrentAt, at: clock())
@@ -278,3 +280,5 @@ final class UpdateModel: ObservableObject {
         }
     }
 }
+
+#endif

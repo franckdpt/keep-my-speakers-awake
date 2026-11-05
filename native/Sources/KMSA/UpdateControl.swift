@@ -1,7 +1,8 @@
+#if !APP_STORE
 import SwiftUI
 import KMSACore
 
-/// One stable footer slot for search, update, progress and completion.
+/// Shown only for an available update or an installation in progress.
 struct UpdateControl: View {
     @ObservedObject var updater: UpdateModel
     let action: () -> Void
@@ -31,25 +32,7 @@ struct UpdateControl: View {
                                 .accessibilityLabel(L10n.text(updater.status ?? .checkingUpdates))
                         }
                     }
-                } else if updater.isUpToDate {
-                    HStack(spacing: 8) {
-                        Label {
-                            Text(L10n.text(.appUpToDate))
-                                .foregroundStyle(.secondary)
-                        } icon: {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundStyle(.green)
-                        }
-                            .font(.caption)
-                            .fixedSize()
-                        Spacer(minLength: 0)
-                        Button(L10n.text(.checkUpdates), action: action)
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(updater.busy)
-                            .help(L10n.text(.automaticUpdateChecks))
-                    }
-                } else {
+                } else if updater.hasUpdate {
                     Button(action: action) {
                         Text(updater.buttonTitle)
                             .frame(maxWidth: .infinity)
@@ -57,7 +40,7 @@ struct UpdateControl: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(updater.busy)
-                    .help(L10n.text(updater.hasUpdate ? .updateExplanation : .automaticUpdateChecks))
+                    .help(L10n.text(.updateExplanation))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -72,3 +55,5 @@ struct UpdateControl: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+#endif

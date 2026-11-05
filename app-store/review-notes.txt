@@ -1,0 +1,11 @@
+Keep My Speakers Awake is a menu bar utility. It has no Dock icon or main window. Click its jack icon in the macOS menu bar to open the controls. No account or sign-in is required.
+
+This is the Mac App Store build: App Sandbox is enabled, the standalone GitHub updater and installer helper are excluded, and updates are delivered by the App Store. Start at login is opt-in using SMAppService.
+
+Hardware requirement: Apple Silicon Mac, macOS 14.2+, powered speakers connected directly to the Mac’s built-in analog headphone/jack output. Bluetooth, AirPlay, HDMI and USB interfaces are deliberately ineligible. Without a compatible output the app remains paused and displays the missing-jack message.
+
+Automatic playback is off on first launch. For a real playback test, connect eligible speakers, ensure no microphone is active, use a modest listening level and click Test wake-up. A short low-frequency signal plays. A microphone in use or unknown activity blocks both automatic playback and manual tests. The app reads Core Audio process/device activity metadata and elapsed input idle time, without recording audio or keyboard/mouse events. It has no capture session and requests no microphone or camera permission.
+
+Smart Mode adds inactivity and output-level protections. Effectiveness and audibility depend on hardware. Please do not interpret the hardware-specific scope as a guarantee for all speakers.
+
+All submitted screenshots must match this App Store build. Real audio playback and hardware behavior must be manually validated before submission; simulated policy checks are separate.

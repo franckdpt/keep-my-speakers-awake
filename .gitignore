@@ -13,3 +13,8 @@ landing/public/downloads/
 *.p12
 *.p8
 *.mobileprovision
+
+*.provisionprofile
+*.key.pem
+*.certSigningRequest
+*.cer

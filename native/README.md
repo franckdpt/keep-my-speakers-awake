@@ -172,10 +172,15 @@ menu-bar panel, and resets the cursor when leaving or removing the link.
 Version 1.7.10 renders the GitHub label with the same SwiftUI caption size and
 secondary color as the adjacent KMSA version, retaining native hover and clicks.
 
+Version 1.7.11 removes the manual update-search button and up-to-date message.
+The footer shrinks when no update is available. Automatic detection reveals the
+versioned update button; download, verification and restart progress stay visible
+during installation, with retry and error details if installation fails.
+
 ## In-app updates
 
-Update checks run at app startup and every 12 hours, with a manual check available
-at any time. Sleep/session-return notifications run a due check; repeated
+Update checks run silently at app startup and every 12 hours.
+Sleep/session-return notifications run a due check; repeated
 notifications do not duplicate requests. A failed check retries after one hour,
 keeps any previously detected update badge and never claims the app is up to date.
 The app owns the updater even while the panel is closed. Automatic checks show no

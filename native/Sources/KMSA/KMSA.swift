@@ -70,11 +70,19 @@ enum EntryPoint {
             let size = view.fittingSize
             view.frame = NSRect(origin: .zero, size: size)
             view.layoutSubtreeIfNeeded()
-            guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
+            guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
+                pixelsWide: Int(ceil(size.width * 3)), pixelsHigh: Int(ceil(size.height * 3)),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { exit(1) }
+            bitmap.size = size
             view.cacheDisplay(in: view.bounds, to: bitmap)
             guard let data = bitmap.representation(using: .png, properties: [:]) else { exit(1) }
-            try! data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
-            print("Rendered native controls without starting playback.")
+            if CommandLine.arguments[index + 1] == "-" {
+                FileHandle.standardOutput.write(data)
+            } else {
+                try! data.write(to: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+                print("Rendered native controls without starting playback.")
+            }
             return
         }
         if let index = CommandLine.arguments.firstIndex(of: "--preview-icons"), CommandLine.arguments.count > index + 1 {
@@ -622,9 +630,13 @@ struct ControlPanel: View {
             }
             VStack(spacing: 8) {
                 Divider()
-                UpdateControl(updater: updater) {
-                    Task { await updater.check { model.stop() } }
+                #if !APP_STORE
+                if updater.showsControl {
+                    UpdateControl(updater: updater) {
+                        Task { await updater.check { model.stop() } }
+                    }
                 }
+                #endif
                 HStack(spacing: 6) {
                     Text("KMSA · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")").font(.caption2).foregroundStyle(.secondary)
                     Text("•")

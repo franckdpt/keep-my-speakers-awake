@@ -5,10 +5,13 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { ASSET_NAME, readVersion, validateTag } from './release-contract.mjs';
+import { distributionConfig, APPLE_TEAM_ID } from './distribution.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const run = (cmd, args) => execFileSync(cmd, args, {cwd: root, encoding:'utf8'}).trim();
 const version = readVersion();
+const distribution = distributionConfig();
+if (distribution.appStore) throw new Error('Use package:app-store for the Mac App Store edition.');
 const dmgPython = process.env.KMSA_DMG_PYTHON || 'python3';
 run(dmgPython, ['-c', 'import dmgbuild, ds_store']);
 if (process.env.KMSA_EXPECTED_TAG) validateTag(process.env.KMSA_EXPECTED_TAG, version.version);
@@ -26,11 +29,16 @@ let mounted = false;
 const mount = join(staging,'verify-mount');
 
 try {
+  if (plist(sourceApp,'KMSADistributionChannel') !== distribution.channel) throw new Error('Build and package with the same KMSA_DISTRIBUTION.');
   await mkdir(contents);
   await mkdir(destination, {recursive:true});
   run('ditto',['--noextattr','--norsrc',sourceApp,stagedApp]);
   run('xattr',['-cr',stagedApp]);
   run('codesign',['--verify','--deep','--strict',stagedApp]);
+  if (distribution.channel === 'developer-id') {
+    run('codesign',['--verify','--deep','--strict','-R',`=anchor apple generic and certificate leaf[subject.OU] = "${APPLE_TEAM_ID}"`,stagedApp]);
+    run('node',[join(root,'scripts/notarize.mjs'),stagedApp]);
+  }
   if (plist(stagedApp,'CFBundleShortVersionString') !== version.version ||
       plist(stagedApp,'CFBundleVersion') !== String(version.build) ||
       plist(stagedApp,'LSMinimumSystemVersion') !== version.minimumMacOS) {
@@ -46,6 +54,10 @@ try {
   run(dmgPython, ['-m','dmgbuild','-s',join(root,'scripts/dmg-settings.py'),
     '-D',`app=${stagedApp}`,'-D',`background=${join(staging,'background.png')}`,
     'Keep My Speakers Awake',dmg]);
+  if (distribution.channel === 'developer-id') {
+    run('codesign',['--force','--timestamp','--sign',distribution.identity,dmg]);
+    run('node',[join(root,'scripts/notarize.mjs'),dmg]);
+  }
   run('hdiutil',['verify',dmg]);
   await mkdir(mount);
   run('hdiutil',['attach','-readonly','-nobrowse','-mountpoint',mount,dmg]);
@@ -53,6 +65,10 @@ try {
   const mountedApp = join(mount,appName);
   run(dmgPython, [join(root,'scripts/verify-dmg-layout.py'), mount]);
   run('codesign',['--verify','--deep','--strict',mountedApp]);
+  if (distribution.channel === 'developer-id') {
+    run('xcrun',['stapler','validate',mountedApp]);
+    run('spctl',['--assess','--type','execute','-v',mountedApp]);
+  }
   if (plist(mountedApp,'CFBundleShortVersionString') !== version.version ||
       await sha256(join(mountedApp,'Contents/MacOS/KMSA')) !== await sha256(executable)) {
     throw new Error('Mounted DMG does not contain the verified app.');
@@ -63,7 +79,8 @@ try {
   await writeFile(join(destination,'SHA256SUMS.txt'),`${hash}  ${ASSET_NAME}\n`);
   await writeFile(join(destination,'release-manifest.json'),JSON.stringify({
     ...version, architecture:'arm64', asset:ASSET_NAME, sourceRevision:revision,
-    sha256:hash, signature:'ad-hoc', notarized:false,
+    sha256:hash, signature:distribution.signed?'developer-id':'ad-hoc', notarized:distribution.signed,
+    ...(distribution.signed ? {teamIdentifier:APPLE_TEAM_ID} : {}),
   },null,2)+'\n');
   console.log(`Verified KMSA ${version.version} (${version.build}), arm64, source ${revision}.\n${hash}  ${ASSET_NAME}`);
 } finally {

@@ -1,3 +1,4 @@
+#if !APP_STORE
 import Foundation
 import KMSACore
 
@@ -35,9 +36,9 @@ extension UpdateModel {
             calls += 1
             return try responses.removeFirst().get()
         })
-        expect(calls == 0 && model.status == nil && !model.hasUpdate)
+        expect(calls == 0 && model.status == nil && !model.hasUpdate && !model.showsControl)
         await model.checkAutomatically()
-        expect(calls == 1 && model.status == .appUpToDate && !model.hasUpdate && !model.busy)
+        expect(calls == 1 && model.status == .appUpToDate && !model.hasUpdate && !model.busy && !model.showsControl)
         await model.checkAutomatically() // Duplicate startup/wake/session notifications coalesce.
         expect(calls == 1)
         now.addTimeInterval(UpdateCheckSchedule.checkInterval - 1)
@@ -45,7 +46,7 @@ extension UpdateModel {
         expect(calls == 1)
         now.addTimeInterval(1)
         await model.checkAutomatically()
-        expect(calls == 2 && model.hasUpdate && model.status == .updateAvailable)
+        expect(calls == 2 && model.hasUpdate && model.status == .updateAvailable && model.showsControl)
         now.addTimeInterval(UpdateCheckSchedule.checkInterval)
         await model.checkAutomatically()
         expect(calls == 3 && model.hasUpdate && model.status == .updateCheckFailed && !model.busy)
@@ -72,7 +73,7 @@ extension UpdateModel {
 
         let offline = UpdateModel(defaults: defaults, fetchLatest: { throw URLError(.notConnectedToInternet) })
         await offline.checkAutomatically()
-        expect(offline.status == .updateCheckFailed && !offline.hasUpdate)
+        expect(offline.status == .updateCheckFailed && !offline.hasUpdate && !offline.showsControl)
         let manual = UpdateModel(defaults: defaults, fetchLatest: { nil })
         await manual.check { preconditionFailure("An up-to-date check must never restart the app") }
         expect(manual.status == .appUpToDate && !manual.busy)
@@ -96,7 +97,7 @@ extension UpdateModel {
 
         var late: (@Sendable (UpdateFetchProgress) -> Void)?
         await search.install(offer: offer) { progress in
-            expect(search.showsProgress && search.downloadProgress == 0)
+            expect(search.showsProgress && search.showsControl && search.downloadProgress == 0)
             late = progress
             progress(.downloading(0.4))
             try await Task.sleep(nanoseconds: 1_000_000)
@@ -112,14 +113,14 @@ extension UpdateModel {
             try await Task.sleep(nanoseconds: 1_000_000)
             expect(search.status == .verifyingUpdate && search.downloadProgress == nil && search.showsProgress)
         }
-        expect(search.isUpToDate && !search.hasUpdate && !search.showsProgress && search.downloadProgress == nil)
+        expect(search.isUpToDate && !search.hasUpdate && !search.showsProgress && !search.showsControl && search.downloadProgress == nil)
         late?(.downloading(0.1))
         try! await Task.sleep(nanoseconds: 1_000_000)
         expect(search.isUpToDate && search.downloadProgress == nil)
 
         let retry = UpdateModel(defaults: defaults)
         await retry.install(offer: offer) { _ in throw URLError(.notConnectedToInternet) }
-        expect(retry.hasUpdate && !retry.isUpToDate && !retry.showsProgress && retry.errorMessage == .updateCheckFailed)
+        expect(retry.hasUpdate && !retry.isUpToDate && !retry.showsProgress && retry.showsControl && retry.errorMessage == .updateCheckFailed)
 
         let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
         let receiptDefaults = isolatedDefaults()
@@ -186,3 +187,5 @@ extension UpdateModel {
         print("Passed \(count) update-model checks: 12-hour checks, offline retry, badge, UI flow, relaunch receipt and version-bound 24-hour confirmations. No network, user preferences or audio used.")
     }
 }
+
+#endif

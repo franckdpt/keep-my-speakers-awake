@@ -1,0 +1,15 @@
+{
+  "name": "Keep My Speakers Awake",
+  "category": "public.app-category.utilities",
+  "secondaryCategory": "public.app-category.music",
+  "marketingUrl": "https://franckdupont.com/kmsa/",
+  "supportUrl": "https://github.com/franckdpt/keep-my-speakers-awake/issues",
+  "privacyPolicyUrl": "https://github.com/franckdpt/keep-my-speakers-awake/blob/main/app-store/PRIVACY.md",
+  "copyright": "2026 Franck Dupont",
+  "price": "Free",
+  "bundleId": "fr.franckdupont.kmma.native",
+  "subtitle": "Keep your jack speakers ready",
+  "promotionalText": "A small menu bar utility that sends periodic low-frequency signals to help compatible speakers stay awake, with automatic playback protections.",
+  "keywords": "speakers,standby,audio,jack,menu bar,studio,monitor,awake,sound,utility",
+  "description": "Keep My Speakers Awake helps prevent compatible powered speakers from entering standby when connected to the built-in analog jack on your Mac.\n\nA SMALL UTILITY IN YOUR MENU BAR\nTurn automatic wake-up signals on or off, adjust the signal level, run a manual wake-up test and choose whether the app opens at login.\n\nAUTOMATIC WAKE-UP SIGNALS\nThe app sends a short, low-frequency signal approximately every 10 minutes when playback conditions allow. It can also send a signal when an eligible jack connection is restored or you return to your Mac with Smart Mode enabled.\n\nPLAYBACK PROTECTIONS\nAn active microphone, or unknown microphone activity, blocks all signals, including manual tests. Smart Mode also pauses automatic signals when the Mac is inactive with no audio, or when other playback is active at a Mac output level of 50% or higher. Sleep, a locked session or a disconnected jack also prevent playback.\n\nDESIGNED FOR A SPECIFIC SETUP\nRequires an Apple Silicon Mac running macOS 14.2 or later and speakers connected to the Mac’s built-in analog jack. Bluetooth, AirPlay, HDMI and USB audio interfaces are not supported wake-up outputs. Effectiveness and audibility depend on your speakers, volume and audio setup. The app cannot guarantee compatibility with every speaker’s standby system.\n\nPRIVATE BY DESIGN\nNo account, advertising or analytics. The app observes system audio activity and elapsed input inactivity locally; it does not record microphone audio, keyboard input or mouse movements. Settings and bounded diagnostic logs stay on your Mac.\n\nAvailable in English and French. Updates to this edition are delivered through the Mac App Store."
+}

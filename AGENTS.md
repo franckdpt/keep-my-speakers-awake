@@ -1,7 +1,7 @@
 # KMSA development
 
 - Canonical repository: `franckdpt/keep-my-speakers-awake`, branch `main`. This is the standalone native app and landing, separate from the legacy browser extension repository.
-- Preserve microphone/route/session/output-volume/presence protections. Hardware behavior is distinct from policy checks. Never emit audio during automated verification.
+- Preserve microphone/route/system-sleep/user-session/presence protections and the selected signal gain. The user explicitly removed the 50% output-volume cutoff and audio grace period in 1.7.12: known output audio must keep automatic Smart Mode signals eligible at any volume, including with the current user's screen asleep or locked. Hardware behavior is distinct from policy checks. Never emit audio during automated verification.
 - `version.json` is the single version source. Increase version and build together; release tags must equal `v<version>`.
 - Apple Silicon only for current releases. Preserve the bytes of `signals/sub2.wav` and the stable bundle identifier.
 - Run `npm test`, `npm run check:native`, `npm run build`, then the built executable's `--self-check` for native changes.

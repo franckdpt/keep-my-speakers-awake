@@ -14,41 +14,34 @@ private func expectNil<T>(_ actual: T?, file: StaticString = #file, line: UInt =
 }
 
 final class PlaybackPolicyTests {
-    let now = Date(timeIntervalSince1970: 1000)
-
-    func block(enabled: Bool = true, test: Bool = false, session: Bool = true,
+    func block(enabled: Bool = true, test: Bool = false, session: Bool = true, screen: Bool = true,
                jack: String? = "jack-a", smart: Bool = true,
-               known: Bool = true, busy: Bool = false, lastBusy: Date? = nil,
+               known: Bool = true, busy: Bool = false,
                capture: CaptureState = .clear,
-               volume: Double? = nil, idle: TimeInterval? = 0,
+               idle: TimeInterval? = 0,
                trigger: PlaybackTrigger? = nil) -> PlaybackBlock? {
-        PlaybackPolicy.block(enabled: enabled, trigger: trigger ?? (test ? .manualTest : .automatic), sessionAvailable: session,
+        PlaybackPolicy.block(enabled: enabled, trigger: trigger ?? (test ? .manualTest : .automatic), sessionAvailable: session, screenAvailable: screen,
                              jackUID: jack, smartMode: smart,
-                             activityKnown: known, audioBusy: busy, lastBusyAt: lastBusy, now: now,
-                             captureState: capture, outputVolume: volume, idleSeconds: idle)
+                             activityKnown: known, audioBusy: busy,
+                             captureState: capture, idleSeconds: idle)
     }
 
-    func testAudioPausesOnlyAtHalfVolumeOrAbove() {
-        for volume in [0.0, 0.0625, 0.25, 0.499999] {
-            expectNil(block(busy: true, volume: volume))
-            for test in [false, true] {
-                expectEqual(block(test: test, busy: true, capture: .microphone, volume: volume), .microphoneInUse)
-                expectEqual(block(test: test, busy: true, capture: .unknown, volume: volume), .unknownCapture)
+    func testAudioKeepsAutomaticSignalsEligible() {
+        for screen in [true, false] {
+            for idle: TimeInterval? in [0, 3600, nil, .nan] {
+                expectNil(block(screen: screen, busy: true, idle: idle))
+                expectEqual(block(screen: screen, busy: true, capture: .microphone, idle: idle), .microphoneInUse)
+                expectEqual(block(screen: screen, busy: true, capture: .unknown, idle: idle), .unknownCapture)
+                expectEqual(block(session: false, screen: screen, busy: true, idle: idle), .unavailableSession)
+                expectEqual(block(screen: screen, jack: nil, busy: true, idle: idle), .wrongOutput)
             }
         }
-        for volume in [0.5, 0.75, 1.0] {
-            expectEqual(block(busy: true, volume: volume), .audioInUse)
-            expectNil(block(busy: false, volume: volume))
-            expectNil(block(test: true, busy: true, volume: volume))
-            expectNil(block(smart: false, busy: true, volume: volume))
-        }
-        for volume: Double? in [nil, .nan, .infinity, -0.1, 1.1] {
-            expectEqual(block(busy: true, volume: volume), .audioInUse)
-            expectNil(block(busy: false, volume: volume))
-        }
-        expectEqual(block(known: false, busy: true, volume: 0.0625), .unknownActivity)
-        expectEqual(block(busy: true, lastBusy: now, volume: 0.0625), .recentAudio)
-        expectNil(block(busy: true, lastBusy: now.addingTimeInterval(-120), volume: 0.0625))
+        expectEqual(block(screen: false), .unavailableSession)
+        expectEqual(block(screen: false, smart: false, busy: true), .unavailableSession)
+        expectEqual(block(screen: false, known: false, busy: true), .unavailableSession)
+        expectEqual(block(test: true, screen: false, busy: true), .unavailableSession)
+        expectEqual(block(enabled: false, screen: false, busy: true), .paused)
+        expectEqual(block(known: false, busy: true), .unknownActivity)
     }
 
     func testAutomaticPlaybackNeedsAllProtections() {
@@ -58,26 +51,19 @@ final class PlaybackPolicyTests {
         expectEqual(block(jack: nil), .wrongOutput)
         expectEqual(block(jack: ""), .wrongOutput)
         expectEqual(block(known: false), .unknownActivity)
-        expectEqual(block(busy: true), .audioInUse)
+        expectNil(block(busy: true))
     }
 
     func testManualTestCannotEscapeThePhysicalOutputAndSessionGate() {
-        expectNil(block(enabled: false, test: true, known: false, busy: true, lastBusy: now))
+        expectNil(block(enabled: false, test: true, known: false, busy: true))
         expectEqual(block(test: true, session: false), .unavailableSession)
         expectEqual(block(test: true, jack: nil), .wrongOutput)
     }
 
     func testSmartToggleCannotDisableTheJackProtection() {
-        expectNil(block(smart: false, known: false, busy: true, lastBusy: now))
+        expectNil(block(smart: false, known: false, busy: true))
         expectEqual(block(jack: nil, smart: false), .wrongOutput)
         expectEqual(block(session: false, smart: false), .unavailableSession)
-    }
-
-    func testGracePeriodIncludesItsBoundaryAndClockChanges() {
-        expectEqual(block(lastBusy: now.addingTimeInterval(-119.9)), .recentAudio)
-        expectNil(block(lastBusy: now.addingTimeInterval(-120)))
-        expectNil(block(lastBusy: now.addingTimeInterval(-121)))
-        expectEqual(block(lastBusy: now.addingTimeInterval(60)), .recentAudio)
     }
 
     func testMicrophoneProtectionAlwaysBlocksSignals() {
@@ -96,12 +82,11 @@ final class PlaybackPolicyTests {
         expectNil(block(idle: 299.999))
         expectEqual(block(idle: 300), .inactive)
         expectEqual(block(idle: 3600), .inactive)
-        expectNil(block(busy: true, volume: 0.25, idle: 3600))
-        expectEqual(block(busy: true, volume: 0.5, idle: 3600), .audioInUse)
+        expectNil(block(busy: true, idle: 3600))
         expectEqual(block(capture: .microphone, idle: 0), .microphoneInUse)
         for idle: TimeInterval? in [nil, .nan, .infinity, -1] {
             expectEqual(block(idle: idle), .unknownActivity)
-            expectNil(block(busy: true, volume: 0.25, idle: idle))
+            expectNil(block(busy: true, idle: idle))
         }
         expectNil(block(smart: false, idle: 3600))
         expectNil(block(test: true, idle: 3600))
@@ -182,10 +167,9 @@ enum PolicyChecks {
     static func main() {
         let policy = PlaybackPolicyTests()
         policy.testAutomaticPlaybackNeedsAllProtections()
-        policy.testAudioPausesOnlyAtHalfVolumeOrAbove()
+        policy.testAudioKeepsAutomaticSignalsEligible()
         policy.testManualTestCannotEscapeThePhysicalOutputAndSessionGate()
         policy.testSmartToggleCannotDisableTheJackProtection()
-        policy.testGracePeriodIncludesItsBoundaryAndClockChanges()
         policy.testMicrophoneProtectionAlwaysBlocksSignals()
         policy.testMicrophoneDetection()
         policy.testLanguageUsesOnlyThePrimaryPreference()

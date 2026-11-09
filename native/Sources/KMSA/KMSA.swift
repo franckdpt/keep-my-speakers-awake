@@ -106,6 +106,7 @@ enum EntryPoint {
             RepositoryLink.runChecks()
             PanelCorners.runChecks()
             AppModel.runCountdownChecks()
+            AppModel.runBackgroundAudioChecks()
             let suite = "fr.franckdupont.kmsa.check.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suite)!
             defer { defaults.removePersistentDomain(forName: suite) }
@@ -152,23 +153,16 @@ enum EntryPoint {
                 simulatedAudio.outputBusy = true
                 protectedModel.refresh()
                 precondition(protectedModel.block == nil && protectedModel.canTest)
-                protectedModel.refresh()
-                precondition(protectedModel.block == nil) // Low-volume audio must not refresh the grace period.
-                simulatedVolume = 0.499
-                protectedModel.refresh()
-                precondition(protectedModel.block == nil)
-                simulatedVolume = 0.5
-                protectedModel.refresh()
-                precondition(protectedModel.block == .audioInUse && protectedModel.canTest)
-                simulatedVolume = nil
-                protectedModel.refresh()
-                precondition(protectedModel.block == .audioInUse)
-                simulatedVolume = 0.0625
-                protectedModel.refresh()
-                precondition(protectedModel.block == .recentAudio)
+                for level: Double? in [0, 0.0625, 0.499, 0.5, 1, nil] {
+                    simulatedVolume = level
+                    protectedModel.refresh()
+                    precondition(protectedModel.block == nil && protectedModel.canTest)
+                }
                 simulatedAudio.outputBusy = false
+                protectedModel.refresh()
+                precondition(protectedModel.block == nil) // No former loud-audio grace remains.
                 protectedModel.enabled = false
-                print("Smart output checks passed: quiet playback below 50% stays eligible without adding grace, 50%/unknown blocks automatic signals, Test remains available. No audio played.")
+                print("Smart output checks passed: playback stays eligible at every output volume, including unavailable volume, without an audio grace period. No audio played.")
                 defaults.set(true, forKey: "meetingPause") // A former saved pause must not block the new version.
                 let captureModel = AppModel(defaults: defaults, readRoute: { simulatedRoute },
                                             readAudio: { _ in simulatedAudio }, readOutputVolume: { _ in simulatedVolume },
@@ -461,7 +455,6 @@ enum EntryPoint {
                 let camera: CameraHardware.Snapshot
                 let idleSeconds: TimeInterval?
                 let macOutputVolume: Double?
-                let outputNeedsPause: Bool
                 let profiles: [String]
                 let missingFiles: [String]
             }
@@ -475,7 +468,6 @@ enum EntryPoint {
             let volume = HAL.outputVolume(route.device)
             let diagnostic = Diagnostic(route: route, activity: activity,
                                         camera: CameraHardware.snapshot(), idleSeconds: AppModel.inputIdleSeconds(), macOutputVolume: volume,
-                                        outputNeedsPause: PlaybackPolicy.outputAudioRequiresPause(outputBusy: activity.outputBusy, outputVolume: volume),
                                         profiles: catalog.map(\.id), missingFiles: missing)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

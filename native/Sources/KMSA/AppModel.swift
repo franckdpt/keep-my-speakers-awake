@@ -43,6 +43,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private let diagnostics: DiagnosticLog
     private let clock: () -> Date
     private let readSessionAvailable: () -> Bool
+    private let readSessionOnConsole: () -> Bool
     private var lastStateKey = ""
     private var lastHeartbeat = Date.distantPast
     private let defaults: UserDefaults
@@ -53,17 +54,25 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private let makePlayer: (URL) throws -> any SignalPlayer
     private var player: (any SignalPlayer)?
     private var observer: HardwareObserver?
+    private var audioObserver: AudioActivityObserver?
     private var timer: Timer?
     private var notifications: [(NotificationCenter, NSObjectProtocol)] = []
-    private var lastBusyAt: Date?
-    private var sessionSuspended = false
+    private enum SessionSuspension: Hashable { case systemSleep, inactiveSession }
+    private var sessionSuspensions: Set<SessionSuspension> = []
+    private var sessionSuspended: Bool { !sessionSuspensions.isEmpty }
+    private var screensSleeping = false
+    private var screenLocked = false
+    private var timingActivity: NSObjectProtocol?
+    static let playbackActivityOptions: ProcessInfo.ActivityOptions = .userInitiatedAllowingIdleSystemSleep
+    var backgroundTimingActive: Bool { timingActivity != nil }
     private var presenceTracker = PresenceTracker()
     private var pendingPresenceReturn = false
 
     init(defaults: UserDefaults = .standard,
          diagnostics: DiagnosticLog = .disabled,
          clock: @escaping () -> Date = Date.init,
-         readSessionAvailable: @escaping () -> Bool = AppModel.consoleSessionAvailable,
+         readSessionAvailable: (() -> Bool)? = nil,
+         readSessionOnConsole: (() -> Bool)? = nil,
          readRoute: @escaping () -> HAL.Route = HAL.route,
          readAudio: @escaping (UInt32) -> HAL.Activity = { HAL.activity(output: $0) },
          readOutputVolume: @escaping (UInt32) -> Double? = HAL.outputVolume,
@@ -71,7 +80,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
          makePlayer: @escaping (URL) throws -> any SignalPlayer = { try AVAudioPlayer(contentsOf: $0) }) {
         self.diagnostics = diagnostics
         self.clock = clock
-        self.readSessionAvailable = readSessionAvailable
+        self.readSessionAvailable = readSessionAvailable ?? AppModel.consoleSessionAvailable
+        // Existing injected session readers remain a hard gate unless a test explicitly
+        // models a locked, still-on-console listening session separately.
+        self.readSessionOnConsole = readSessionOnConsole ?? readSessionAvailable ?? AppModel.consoleSessionOnConsole
         self.defaults = defaults
         self.readRoute = readRoute
         self.readAudio = readAudio
@@ -94,6 +106,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         observer = HardwareObserver { [weak self] in
             Task { @MainActor in self?.hardwareChanged() }
         }
+        audioObserver = AudioActivityObserver { [weak self] in self?.refresh() }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
@@ -115,7 +128,17 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return seconds.isFinite && seconds >= 0 ? seconds : nil
     }
 
-    var sessionAvailable: Bool { !sessionSuspended && readSessionAvailable() }
+    var sessionAvailable: Bool {
+        consoleSessionAvailable && !screensSleeping && !screenLocked && readSessionAvailable()
+    }
+
+    private var consoleSessionAvailable: Bool { !sessionSuspended && readSessionOnConsole() }
+
+    nonisolated static func consoleSessionOnConsole() -> Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session[kCGSessionOnConsoleKey as String] as? Bool == true &&
+               session[kCGSessionLoginDoneKey as String] as? Bool == true
+    }
 
     nonisolated static func consoleSessionAvailable() -> Bool {
         guard
@@ -144,12 +167,12 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func block(trigger: PlaybackTrigger) -> PlaybackBlock? {
         PlaybackPolicy.block(enabled: enabled, trigger: trigger,
-                             sessionAvailable: sessionAvailable, jackUID: route.jackUID,
+                             sessionAvailable: consoleSessionAvailable, screenAvailable: sessionAvailable,
+                             jackUID: route.jackUID,
                              smartMode: smartMode,
                              activityKnown: activity.known, audioBusy: activity.outputBusy,
-                             lastBusyAt: lastBusyAt, now: now,
                              captureState: captureState,
-                             outputVolume: macOutputVolume, idleSeconds: idleSeconds)
+                             idleSeconds: idleSeconds)
     }
 
     private func hardwareChanged() {
@@ -183,10 +206,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             pendingPresenceReturn = false
         }
         captureState = CaptureState.detect(audioKnown: activity.known, microphoneBusy: activity.microphoneBusy)
-        let outputNeedsPause = PlaybackPolicy.outputAudioRequiresPause(outputBusy: activity.outputBusy,
-                                                                       outputVolume: macOutputVolume)
-        if outputNeedsPause { lastBusyAt = now }
-        if !sessionAvailable || route.jackUID == nil {
+        if !consoleSessionAvailable || route.jackUID == nil {
             stop(reason: "session_or_route_unavailable")
         } else if captureState != .clear {
             stop(reason: "microphone_protection") // Active or unknown microphone state also interrupts an explicit test.
@@ -197,6 +217,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         else if let block { status = Self.label(block) }
         else { status = L10n.text(.ready) }
         if profiles.isEmpty { status = L10n.text(.audioFilesUnavailable) }
+        updatePlaybackActivity()
         recordState()
     }
 
@@ -255,7 +276,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             }
             // The output can change while a file is loading. Recheck immediately before starting.
             let fresh = readRoute()
-            guard fresh == route, fresh.jackUID != nil, sessionAvailable else {
+            guard fresh == route, fresh.jackUID != nil, consoleSessionAvailable else {
                 hardwareChanged()
                 log("signal_failed", ["source": source, "reason": "route_changed_before_play"])
                 message = L10n.text(.routeChanged)
@@ -320,19 +341,19 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func observeWorkspace() {
         let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
-            observe(center, name) { [weak self] in self?.suspend(reason: name.rawValue) }
-        }
-        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
-            observe(center, name) { [weak self] in self?.resume(reason: name.rawValue) }
-        }
+        observe(center, NSWorkspace.willSleepNotification) { [weak self] in self?.suspend(reason: "system_sleep") }
+        observe(center, NSWorkspace.didWakeNotification) { [weak self] in self?.resume(reason: "system_wake") }
+        observe(center, NSWorkspace.sessionDidResignActiveNotification) { [weak self] in self?.setSessionActive(false) }
+        observe(center, NSWorkspace.sessionDidBecomeActiveNotification) { [weak self] in self?.setSessionActive(true) }
+        observe(center, NSWorkspace.screensDidSleepNotification) { [weak self] in self?.setScreensSleeping(true) }
+        observe(center, NSWorkspace.screensDidWakeNotification) { [weak self] in self?.setScreensSleeping(false) }
         observe(NotificationCenter.default, NSApplication.willTerminateNotification) { [weak self] in
             self?.log("app_terminating")
             self?.diagnostics.flush()
         }
         let distributed = DistributedNotificationCenter.default()
-        observe(distributed, Notification.Name("com.apple.screenIsLocked")) { [weak self] in self?.suspend(reason: "screen_locked") }
-        observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) { [weak self] in self?.resume(reason: "screen_unlocked") }
+        observe(distributed, Notification.Name("com.apple.screenIsLocked")) { [weak self] in self?.setScreenLocked(true) }
+        observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) { [weak self] in self?.setScreenLocked(false) }
     }
 
     private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ action: @escaping @MainActor () -> Void) {
@@ -344,23 +365,71 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func suspend(reason: String = "session_suspended") {
         presenceTracker.suspend(at: clock())
-        sessionSuspended = true
+        sessionSuspensions.insert(.systemSleep)
         log("session_suspended", ["notification": reason])
         stop(reason: reason)
         refresh()
     }
 
     func resume(reason: String = "session_resumed") {
-        sessionSuspended = false
+        sessionSuspensions.remove(.systemSleep)
         log("session_resumed", ["notification": reason])
         nextDue = clock().addingTimeInterval(PlaybackPolicy.interval)
         refresh()
+    }
+
+    func setSessionActive(_ active: Bool) {
+        if active {
+            guard sessionSuspensions.remove(.inactiveSession) != nil else { return }
+        } else {
+            guard sessionSuspensions.insert(.inactiveSession).inserted else { return }
+            presenceTracker.suspend(at: clock())
+        }
+        nextDue = clock().addingTimeInterval(PlaybackPolicy.interval)
+        refresh()
+        log(active ? "session_activated" : "session_deactivated")
+    }
+
+    func setScreensSleeping(_ sleeping: Bool) {
+        guard screensSleeping != sleeping else { return }
+        screensSleeping = sleeping
+        if sleeping { presenceTracker.suspend(at: clock()) }
+        refresh() // Preserve the existing schedule and a signal already accompanying music.
+        log(sleeping ? "screens_sleeping" : "screens_awake")
+    }
+
+    func setScreenLocked(_ locked: Bool) {
+        guard screenLocked != locked else { return }
+        screenLocked = locked
+        if locked { presenceTracker.suspend(at: clock()) }
+        refresh()
+        log(locked ? "screen_locked" : "screen_unlocked")
+    }
+
+    private func updatePlaybackActivity() {
+        // Keep our timer responsive during a listening session, even with no visible
+        // window. This does not prevent display sleep or real system sleep.
+        let needed = enabled && smartMode && consoleSessionAvailable && route.jackUID != nil &&
+                     activity.known && activity.outputBusy
+        if needed && timingActivity == nil {
+            timingActivity = ProcessInfo.processInfo.beginActivity(options: Self.playbackActivityOptions,
+                                                                  reason: "Maintain speaker wake-up timing during audio playback")
+        } else if !needed, let token = timingActivity {
+            ProcessInfo.processInfo.endActivity(token)
+            timingActivity = nil
+        }
+    }
+
+    deinit {
+        if let token = timingActivity { ProcessInfo.processInfo.endActivity(token) }
     }
 
     private func log(_ event: String, _ extra: [String: Any] = [:]) {
         var fields: [String: Any] = [
             "enabled": enabled, "smartMode": smartMode, "playing": playing,
             "sessionAvailable": sessionAvailable, "sessionSuspended": sessionSuspended,
+            "sessionOnConsole": readSessionOnConsole(), "screensSleeping": screensSleeping,
+            "screenLocked": screenLocked, "backgroundTimingActive": backgroundTimingActive,
             "jackEligible": route.jackUID != nil, "device": route.device,
             "activityKnown": activity.known, "microphoneBusy": activity.microphoneBusy,
             "outputBusy": activity.outputBusy, "signalVolume": volume,
@@ -369,7 +438,6 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             "block": block?.rawValue ?? "none",
             "secondsUntilDue": nextDue.timeIntervalSince(now),
             "lastSignal": lastSignal.map { ISO8601DateFormatter().string(from: $0) } as Any? ?? NSNull(),
-            "graceRemainingSeconds": lastBusyAt.map { max(0, PlaybackPolicy.grace - now.timeIntervalSince($0)) } ?? 0,
         ]
         fields.merge(extra) { _, new in new }
         diagnostics.record(event, fields: fields)
@@ -393,8 +461,6 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         case .unavailableSession: return L10n.text(.sessionUnavailable)
         case .wrongOutput: return L10n.text(.noJack)
         case .unknownActivity: return L10n.text(.unknownAudio)
-        case .audioInUse: return L10n.text(.audioInUse)
-        case .recentAudio: return L10n.text(.recentAudio)
         case .microphoneInUse: return L10n.text(.microphoneInUse)
         case .unknownCapture: return L10n.text(.unknownMicrophone)
         case .inactive: return L10n.text(.inactive)

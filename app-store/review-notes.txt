@@ -6,6 +6,6 @@ Hardware requirement: Apple Silicon Mac, macOS 14.2+, powered speakers connected
 
 Automatic playback is off on first launch. For a real playback test, connect eligible speakers, ensure no microphone is active, use a modest listening level and click Test wake-up. A short low-frequency signal plays. A microphone in use or unknown activity blocks both automatic playback and manual tests. The app reads Core Audio process/device activity metadata and elapsed input idle time, without recording audio or keyboard/mouse events. It has no capture session and requests no microphone or camera permission.
 
-Smart Mode adds inactivity and output-level protections. Effectiveness and audibility depend on hardware. Please do not interpret the hardware-specific scope as a guarantee for all speakers.
+Smart Mode pauses after five minutes without user input and without output audio. During detected output audio, automatic wake-ups remain eligible at every Mac volume and with the current user’s screen off or locked. Real system sleep and switching away from the current console session still block all playback. An App Nap activity keeps timer scheduling responsive during listening, without preventing display sleep or system sleep. Effectiveness and audibility depend on hardware. Please do not interpret the hardware-specific scope as a guarantee for all speakers.
 
 All submitted screenshots must match this App Store build. Real audio playback and hardware behavior must be manually validated before submission; simulated policy checks are separate.

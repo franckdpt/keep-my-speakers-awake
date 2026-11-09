@@ -6,6 +6,13 @@ It never changes the Mac's volume or chosen output. Speaker wake-ups work offlin
 Update checks contact GitHub at app startup and every 12 hours while the app runs;
 downloads/installations require a click. There is no account, telemetry or upload.
 
+Version 1.7.12 keeps automatic Smart Mode wake-ups running during detected output audio
+at any Mac volume, including when the current user’s screen is asleep or locked.
+It removes the former 50% cutoff and output-audio grace period. System sleep,
+user switching, microphone protection and the physical jack gate still apply.
+An activity assertion keeps the app’s timer responsive during listening without
+preventing display sleep or system sleep. Older rules below describe historical releases.
+
 Version 1.1.0 adds camera-activity protection, blocks manual tests while smart
 capture protection is active, and adds a persistent manual **Pause visio**.
 Version 1.1.1 replaces the menu bar volume-horn symbol with a vertical hi-fi
@@ -269,11 +276,17 @@ missed notifications. This reduces the risk of fallback playback; physical
 unplug/replug and route-change behavior still need testing on the real Mac.
 The tests verify the decision policy, not the driver's timing during hot unplug.
 
-The app pauses on session deactivation, screen sleep, system sleep, or lock
-notifications. It checks the console-session state before playing as well.
-Sleep/resume discards delayed timers rather than playing missed signals.
-After 300 seconds without keyboard/mouse input and no output audio, Smart Mode
-pauses automatic signals. Output audio at low volume keeps passive listening eligible.
+System sleep and user-session deactivation always pause playback. Screen sleep
+and screen locking keep automatic Smart Mode signals eligible while known audio
+output continues on the current user's compatible jack. Manual tests remain
+unavailable on a dark/locked screen. Without output audio, the screen/session
+pause remains; 300 seconds without input and without audio also pauses Smart Mode.
+Real system sleep/resume discards delayed timers rather than playing missed signals.
+Screen sleep/wake does not reset the existing ten-minute listening schedule.
+An App Nap activity is held only while Auto and Smart Mode are on, the current
+console session and jack are eligible, and another process runs output there.
+It explicitly allows both display sleep and system sleep, and ends when these
+conditions stop or the model is destroyed.
 The app queries elapsed input time without reading keys or mouse coordinates.
 The first input after a known five-minute idle period requests an immediate
 signal with Auto and Smart Mode enabled. It is detected by the one-second polling
@@ -287,33 +300,26 @@ return signal. Waking in the background without fresh input does not trigger it.
 On every check (about once a second), Core Audio process activity is read
 without recording audio:
 
-- Another process running output on the selected jack blocks automatic signals
-  only when the Mac's output volume is **50% or higher**, or cannot be read.
-  Below 50%, output activity does not block signals or extend the grace period.
-  The output setting is read every second without changing it. When only stereo
-  channel controls are available, both must reach 50% before audio suppresses
-  the keep-awake signal.
+Process-list, input/output activity and output-device notifications also refresh
+the state, so a new listening session can resume observation from App Nap.
+
+- Another process running output on the selected jack keeps automatic Smart Mode
+  wake-ups eligible regardless of the Mac's output volume, including unavailable
+  volume. There is no output-audio cutoff or grace period. The app still never
+  changes the Mac's volume or the user's chosen signal gain.
 - Another process running an audio input blocks both automatic signals and
   manual Test, even with smart mode disabled, including calls/recordings outside
   the browser. All processes are checked, even if another one is using output.
 - Camera activity does not block signals.
 - No input for at least 300 seconds plus no output audio pauses automatic signals.
   The explicit Test button bypasses inactivity; microphone protection always applies.
-- A two-minute grace period follows output audio at 50% or higher (including
-  unknown volume). Stopping microphone use adds no delay. Lowering the volume stops
-  extending this grace period; a previously started grace period can still end.
-  With music still playing below 50%, signals become eligible automatically
-  after that grace period and run at the next due check.
 - Unknown microphone state blocks all signals, including Test, even with smart
   mode disabled.
 
 This is a conservative **audio I/O activity** check, not an audibility meter.
-The 50% rule is a heuristic based on the Mac's volume setting, not a measurement
-of the app's own volume, actual waveform, or the speakers' standby threshold.
-Some apps keep silent audio streams open and can still block signals when the
-Mac's volume is at least 50%. The app excludes its own audio process from this
-check. Muted output is treated as zero volume; this does not make a muted signal
-audible to the speakers.
+Some apps keep silent output streams open, which can keep Smart Mode eligible.
+The app excludes its own audio process from this check. Muted output is treated
+as zero volume; this does not make a muted signal audible to the speakers.
 
 The native app uses current microphone activity, not meeting identity.
 Once the microphone stops, its block clears immediately. Existing output-audio
@@ -354,7 +360,7 @@ use disabled or temporary loggers and never pollute production history.
 ```
 
 This prints the current route, jack eligibility, Core Audio activity state,
-Mac output volume, input idle duration, whether output audio requires a pause, camera running metadata, and
+Mac output volume, input idle duration, camera running metadata, and
 packaged profile availability. It does not launch the menu bar app or play audio.
 Device UIDs in this output are local identifiers; no diagnostics are uploaded.
 
@@ -363,8 +369,10 @@ defaults, automatic jack detection, packaged audio decoding, scheduling, and dev
 binding without starting playback or changing the user's saved preferences.
 It also injects active/unknown/idle microphone states with Smart Mode on and off
 to check blocking and immediate recovery without starting actual capture.
-Injected low/threshold/unknown volume checks verify quiet playback stays eligible
-without extending the grace period, and 50% starts the automatic-output pause.
+Injected volume checks verify output audio remains eligible at low, high and
+unavailable volume. A simulated hour with a dark/locked screen verifies six
+scheduled signals, unchanged signal gain, and the microphone, route, session,
+Auto-off and real-sleep gates, using in-memory players only.
 `KMSAChecks` runs the independent policy, classification and localization checks without a full
 Xcode installation or XCTest dependency.
 

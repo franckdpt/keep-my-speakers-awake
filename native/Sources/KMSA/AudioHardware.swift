@@ -100,7 +100,7 @@ enum HAL {
         guard let channels = try? list(device, kAudioDevicePropertyPreferredChannelsForStereo,
                                        scope: kAudioObjectPropertyScopeOutput), channels.count == 2 else { return nil }
         let levels = channels.compactMap { read($0) }
-        // Both speakers should be loud enough before suppressing their keep-awake signal.
+        // Report the quieter channel for diagnostics; this does not gate wake-up playback.
         return levels.count == channels.count ? levels.min() : nil
     }
 

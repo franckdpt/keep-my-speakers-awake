@@ -105,7 +105,7 @@ struct RepositoryLink: View {
         defer { defaults.removePersistentDomain(forName: suite) }
         var connected = false
         let model = AppModel(defaults: defaults, readSessionAvailable: { true },
-                             readRoute: { connected ? HAL.Route(device: 0, uid: "link-check", name: "Test", isJack: true, alive: true) : HAL.Route() },
+                             readRoute: { connected ? HAL.Route(device: 0, uid: "link-check", name: "Test", outputKind: .external, alive: true) : HAL.Route() },
                              readAudio: { _ in HAL.Activity(known: true, microphoneBusy: false, outputBusy: false) },
                              readOutputVolume: { _ in 0.25 }, readIdleSeconds: { 0 },
                              makePlayer: { _ in SilentCheckPlayer() })

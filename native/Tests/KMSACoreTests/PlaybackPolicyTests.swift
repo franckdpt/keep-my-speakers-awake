@@ -15,13 +15,13 @@ private func expectNil<T>(_ actual: T?, file: StaticString = #file, line: UInt =
 
 final class PlaybackPolicyTests {
     func block(enabled: Bool = true, test: Bool = false, session: Bool = true, screen: Bool = true,
-               jack: String? = "jack-a", smart: Bool = true,
+               output: String? = "external-a", smart: Bool = true,
                known: Bool = true, busy: Bool = false,
                capture: CaptureState = .clear,
                idle: TimeInterval? = 0,
                trigger: PlaybackTrigger? = nil) -> PlaybackBlock? {
         PlaybackPolicy.block(enabled: enabled, trigger: trigger ?? (test ? .manualTest : .automatic), sessionAvailable: session, screenAvailable: screen,
-                             jackUID: jack, smartMode: smart,
+                             externalOutputUID: output, smartMode: smart,
                              activityKnown: known, audioBusy: busy,
                              captureState: capture, idleSeconds: idle)
     }
@@ -33,7 +33,7 @@ final class PlaybackPolicyTests {
                 expectEqual(block(screen: screen, busy: true, capture: .microphone, idle: idle), .microphoneInUse)
                 expectEqual(block(screen: screen, busy: true, capture: .unknown, idle: idle), .unknownCapture)
                 expectEqual(block(session: false, screen: screen, busy: true, idle: idle), .unavailableSession)
-                expectEqual(block(screen: screen, jack: nil, busy: true, idle: idle), .wrongOutput)
+                expectEqual(block(screen: screen, output: nil, busy: true, idle: idle), .wrongOutput)
             }
         }
         expectEqual(block(screen: false), .unavailableSession)
@@ -48,8 +48,8 @@ final class PlaybackPolicyTests {
         expectNil(block())
         expectEqual(block(enabled: false), .paused)
         expectEqual(block(session: false), .unavailableSession)
-        expectEqual(block(jack: nil), .wrongOutput)
-        expectEqual(block(jack: ""), .wrongOutput)
+        expectEqual(block(output: nil), .wrongOutput)
+        expectEqual(block(output: ""), .wrongOutput)
         expectEqual(block(known: false), .unknownActivity)
         expectNil(block(busy: true))
     }
@@ -57,12 +57,12 @@ final class PlaybackPolicyTests {
     func testManualTestCannotEscapeThePhysicalOutputAndSessionGate() {
         expectNil(block(enabled: false, test: true, known: false, busy: true))
         expectEqual(block(test: true, session: false), .unavailableSession)
-        expectEqual(block(test: true, jack: nil), .wrongOutput)
+        expectEqual(block(test: true, output: nil), .wrongOutput)
     }
 
-    func testSmartToggleCannotDisableTheJackProtection() {
+    func testSmartToggleCannotDisableTheOutputProtection() {
         expectNil(block(smart: false, known: false, busy: true))
-        expectEqual(block(jack: nil, smart: false), .wrongOutput)
+        expectEqual(block(output: nil, smart: false), .wrongOutput)
         expectEqual(block(session: false, smart: false), .unavailableSession)
     }
 
@@ -75,7 +75,7 @@ final class PlaybackPolicyTests {
             }
         }
         expectEqual(block(test: true, session: false, capture: .microphone), .unavailableSession)
-        expectEqual(block(test: true, jack: nil, capture: .microphone), .wrongOutput)
+        expectEqual(block(test: true, output: nil, capture: .microphone), .wrongOutput)
     }
 
     func testIdleRequiresBothNoInputAndNoAudio() {
@@ -148,8 +148,8 @@ final class PlaybackPolicyTests {
         }
         expectEqual(AppText.testWake.localized(in: .french), "Tester le réveil")
         expectEqual(AppText.testWake.localized(in: .english), "Test wake-up")
-        expectEqual(AppText.noJack.localized(in: .french), "Pas de connexion jack détectée")
-        expectEqual(AppText.noJack.localized(in: .english), "No jack connection detected")
+        expectEqual(AppText.noExternalOutput.localized(in: .french), "Aucune sortie audio externe utilisable")
+        expectEqual(AppText.noExternalOutput.localized(in: .english), "No usable external audio output")
         expectEqual(AppText.smartHelp.localized(in: .french).components(separatedBy: "\n").count, 6)
         expectEqual(AppText.smartHelp.localized(in: .english).components(separatedBy: "\n").count, 6)
     }
@@ -169,7 +169,7 @@ enum PolicyChecks {
         policy.testAutomaticPlaybackNeedsAllProtections()
         policy.testAudioKeepsAutomaticSignalsEligible()
         policy.testManualTestCannotEscapeThePhysicalOutputAndSessionGate()
-        policy.testSmartToggleCannotDisableTheJackProtection()
+        policy.testSmartToggleCannotDisableTheOutputProtection()
         policy.testMicrophoneProtectionAlwaysBlocksSignals()
         policy.testMicrophoneDetection()
         policy.testLanguageUsesOnlyThePrimaryPreference()
@@ -177,22 +177,43 @@ enum PolicyChecks {
         policy.testPresenceSurvivesSessionSuspension()
         policy.testIdleRequiresBothNoInputAndNoAudio()
         func classify(_ transport: UInt32 = kAudioDeviceTransportTypeBuiltIn,
-                      _ terminal: UInt32, source: UInt32? = nil, jack: UInt32? = nil, alive: Bool = true) -> Bool {
-            OutputClassifier.isBuiltInJack(transport: transport, terminals: [terminal], sources: source.map { [$0] } ?? [],
-                                           jackControl: jack, alive: alive)
+                      _ terminals: [UInt32] = [], sources: [UInt32] = [], alive: Bool = true,
+                      hasOutput: Bool = true, suboutputs: [OutputKind] = []) -> OutputKind {
+            OutputClassifier.classify(transport: transport, terminals: terminals, sources: sources,
+                                      alive: alive, hasOutput: hasOutput, suboutputs: suboutputs)
         }
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeHeadphones), true)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, UInt32(OUTPUT_HEADPHONES)), true)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, 0, source: UInt32(kIOAudioOutputPortSubTypeHeadphones)), true)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeLine, jack: 1), true)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeHeadphones, jack: 0), false)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeHeadphones, alive: false), false)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeSpeaker, jack: 1), false)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, UInt32(OUTPUT_SPEAKER)), false)
-        expectEqual(classify(kAudioDeviceTransportTypeUSB, kAudioStreamTerminalTypeHeadphones, jack: 1), false)
-        expectEqual(classify(kAudioDeviceTransportTypeBluetooth, UInt32(OUTPUT_HEADPHONES)), false)
-        expectEqual(classify(kAudioDeviceTransportTypeHDMI, kAudioStreamTerminalTypeLine), false)
-        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, kAudioStreamTerminalTypeDigitalAudioInterface), false)
+        for terminal in [kAudioStreamTerminalTypeHeadphones, kAudioStreamTerminalTypeLine,
+                         kAudioStreamTerminalTypeDigitalAudioInterface, UInt32(OUTPUT_HEADPHONES)] {
+            expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, [terminal]), .external)
+        }
+        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, sources: [UInt32(kIOAudioOutputPortSubTypeHeadphones)]), .external)
+        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, [kAudioStreamTerminalTypeSpeaker]), .builtInSpeakers)
+        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, [UInt32(OUTPUT_SPEAKER)]), .builtInSpeakers)
+        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, [kAudioStreamTerminalTypeHeadphones],
+                             sources: [UInt32(kIOAudioOutputPortSubTypeInternalSpeaker)]), .builtInSpeakers)
+        expectEqual(classify(kAudioDeviceTransportTypeBuiltIn, [kAudioStreamTerminalTypeSpeaker],
+                             sources: [UInt32(kIOAudioOutputPortSubTypeHeadphones)]), .external)
+        expectEqual(classify(), .unavailable)
+        for transport in [kAudioDeviceTransportTypeUSB, kAudioDeviceTransportTypeBluetooth,
+                          kAudioDeviceTransportTypeBluetoothLE, kAudioDeviceTransportTypeHDMI,
+                          kAudioDeviceTransportTypeDisplayPort, kAudioDeviceTransportTypeAirPlay,
+                          kAudioDeviceTransportTypeThunderbolt, kAudioDeviceTransportTypeFireWire,
+                          kAudioDeviceTransportTypePCI, kAudioDeviceTransportTypeAVB] {
+            // No terminal metadata or jack connection sensor is required on external hardware.
+            expectEqual(classify(transport), .external)
+            expectEqual(classify(transport, [kAudioStreamTerminalTypeSpeaker]), .external)
+            expectEqual(classify(transport, alive: false), .unavailable)
+            expectEqual(classify(transport, hasOutput: false), .unavailable)
+        }
+        for transport in [kAudioDeviceTransportTypeVirtual, kAudioDeviceTransportTypeUnknown, UInt32.max] {
+            expectEqual(classify(transport, [kAudioStreamTerminalTypeHeadphones]), .unavailable)
+        }
+        expectEqual(classify(kAudioDeviceTransportTypeAggregate, suboutputs: [.external, .external]), .external)
+        for members: [OutputKind] in [[], [.external, .builtInSpeakers], [.external, .unavailable], [.builtInSpeakers]] {
+            expectEqual(classify(kAudioDeviceTransportTypeAggregate, suboutputs: members), .unavailable)
+        }
+        expectEqual(AppText.builtInSpeakers.localized(in: .french), "Haut-parleurs du Mac utilisés · aucun réveil nécessaire")
+        expectEqual(AppText.builtInSpeakers.localized(in: .english), "Mac speakers in use · no wake-up needed")
         let updateChecks = runUpdateChecks()
         print("Passed \(checkCount + updateChecks) native policy, output-classification, localization and update checks (\(updateChecks) update checks). No audio played.")
     }

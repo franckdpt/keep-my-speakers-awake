@@ -10,7 +10,7 @@ extension AppModel {
         player.onPlay = { true }
         var audio = HAL.Activity(known: true, microphoneBusy: false, outputBusy: false)
         let model = AppModel(defaults: defaults, readSessionAvailable: { true },
-                             readRoute: { HAL.Route(device: 0, uid: "countdown-check", name: "Silent check", isJack: true, alive: true) },
+                             readRoute: { HAL.Route(device: 0, uid: "countdown-check", name: "Silent check", outputKind: .external, alive: true) },
                              readAudio: { _ in audio }, readOutputVolume: { _ in 0.25 },
                              readIdleSeconds: { 0 }, makePlayer: { _ in player })
         precondition(model.testSecondsRemaining == nil && model.wakeTestTitle == L10n.text(.testWake))

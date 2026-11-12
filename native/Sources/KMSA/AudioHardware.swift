@@ -53,35 +53,47 @@ enum HAL {
         var device: UInt32 = 0
         var uid = ""
         var name = L10n.text(.unknownOutput)
-        var isJack = false
+        var outputKind: OutputKind = .unavailable
         var alive = false
         var transport: UInt32?
         var terminals: [UInt32] = []
-        var jackControl: UInt32?
         var sources: [UInt32] = []
+        var subdevices: [UInt32] = []
         var error: String?
-        var jackUID: String? { isJack && alive && !uid.isEmpty ? uid : nil }
+        var externalOutputUID: String? { outputKind == .external && alive && !uid.isEmpty ? uid : nil }
     }
 
     static func route() -> Route {
         do {
             let device = try scalar(system, kAudioHardwarePropertyDefaultOutputDevice)
-            let uid = try string(device, kAudioDevicePropertyDeviceUID)
-            let name = try string(device, kAudioObjectPropertyName)
-            let alive = try scalar(device, kAudioDevicePropertyDeviceIsAlive) == 1
-            let transport = try scalar(device, kAudioDevicePropertyTransportType)
-            let streams = try list(device, kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput)
-            let terminals = try streams.map { try scalar($0, kAudioStreamPropertyTerminalType) }
-            // A missing jack control is supported only when the output stream itself identifies a built-in analog port.
-            let jackControl = try? scalar(device, kAudioDevicePropertyJackIsConnected, scope: kAudioObjectPropertyScopeOutput)
-            let sources = (try? list(device, kAudioDevicePropertyDataSource, scope: kAudioObjectPropertyScopeOutput)) ?? []
-            let isJack = OutputClassifier.isBuiltInJack(transport: transport, terminals: terminals, sources: sources,
-                                                       jackControl: jackControl, alive: alive)
-            return Route(device: device, uid: uid, name: name, isJack: isJack, alive: alive,
-                         transport: transport, terminals: terminals, jackControl: jackControl, sources: sources)
+            return try route(device: device, visited: [])
         } catch {
             return Route(error: String(describing: error))
         }
+    }
+
+    private static func route(device: UInt32, visited: Set<UInt32>) throws -> Route {
+        guard device != kAudioObjectUnknown, !visited.contains(device) else { return Route() }
+        let uid = try string(device, kAudioDevicePropertyDeviceUID)
+        let name = try string(device, kAudioObjectPropertyName)
+        let alive = try scalar(device, kAudioDevicePropertyDeviceIsAlive) == 1
+        let transport = try scalar(device, kAudioDevicePropertyTransportType)
+        let streams = try list(device, kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput)
+        // Some external drivers omit terminal/source metadata; transport still identifies their output.
+        let terminals = streams.compactMap { try? scalar($0, kAudioStreamPropertyTerminalType) }
+        let sources = (try? list(device, kAudioDevicePropertyDataSource, scope: kAudioObjectPropertyScopeOutput)) ?? []
+        let subdevices = transport == kAudioDeviceTransportTypeAggregate
+            ? try list(device, kAudioAggregateDevicePropertyActiveSubDeviceList) : []
+        var suboutputs: [OutputKind] = []
+        for subdevice in subdevices {
+            // Input-only members cannot carry the signal; unreadable members fail closed.
+            if try list(subdevice, kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput).isEmpty { continue }
+            suboutputs.append(try route(device: subdevice, visited: visited.union([device])).outputKind)
+        }
+        let outputKind = OutputClassifier.classify(transport: transport, terminals: terminals, sources: sources,
+                                                   alive: alive, hasOutput: !streams.isEmpty, suboutputs: suboutputs)
+        return Route(device: device, uid: uid, name: name, outputKind: outputKind, alive: alive,
+                     transport: transport, terminals: terminals, sources: sources, subdevices: subdevices)
     }
 
     /// Read only: the Mac's output setting, never the signal's own gain or an audio meter.
@@ -150,9 +162,11 @@ final class HardwareObserver {
         add(HAL.system, HAL.address(kAudioHardwarePropertyDevices), onChange)
         if let devices = try? HAL.list(HAL.system, kAudioHardwarePropertyDevices) {
             for device in devices {
-                for selector in [kAudioDevicePropertyJackIsConnected, kAudioDevicePropertyDataSource, kAudioDevicePropertyDeviceIsAlive] {
+                for selector in [kAudioDevicePropertyDataSource, kAudioDevicePropertyStreams] {
                     add(device, HAL.address(selector, kAudioObjectPropertyScopeOutput), onChange)
                 }
+                add(device, HAL.address(kAudioDevicePropertyDeviceIsAlive), onChange)
+                add(device, HAL.address(kAudioAggregateDevicePropertyActiveSubDeviceList), onChange)
             }
         }
     }

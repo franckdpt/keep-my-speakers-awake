@@ -14,7 +14,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             stop()
             nextDue = clock().addingTimeInterval(PlaybackPolicy.interval)
             refresh()
-            if enabled && route.jackUID != nil { play(trigger: .automatic, source: "auto_enabled") }
+            if enabled && route.externalOutputUID != nil { play(trigger: .automatic, source: "auto_enabled") }
         }
     }
     @Published var volume: Double {
@@ -148,6 +148,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return session["CGSSessionScreenIsLocked"] as? Bool != true
     }
 
+    var unavailableOutputText: String {
+        L10n.text(route.outputKind == .builtInSpeakers ? .builtInSpeakers : .noExternalOutput)
+    }
+
     var block: PlaybackBlock? { block(trigger: .automatic) }
     var canTest: Bool { block(trigger: .manualTest) == nil && !profiles.isEmpty }
     var selectedProfile: SignalProfile? { profiles.first { $0.id == profileID } }
@@ -168,7 +172,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func block(trigger: PlaybackTrigger) -> PlaybackBlock? {
         PlaybackPolicy.block(enabled: enabled, trigger: trigger,
                              sessionAvailable: consoleSessionAvailable, screenAvailable: sessionAvailable,
-                             jackUID: route.jackUID,
+                             externalOutputUID: route.externalOutputUID,
                              smartMode: smartMode,
                              activityKnown: activity.known, audioBusy: activity.outputBusy,
                              captureState: captureState,
@@ -185,13 +189,13 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         now = clock()
         let current = readRoute()
         if current != route {
-            log("route_changed", ["device": current.device, "jackEligible": current.jackUID != nil,
+            log("route_changed", ["device": current.device, "externalOutputEligible": current.externalOutputUID != nil,
                                   "alive": current.alive, "routeError": current.error ?? "none"])
             stop(reason: "route_changed")
             route = current
             message = nil
-            // A newly selected jack becomes eligible on the next tick without a user answer.
-            if route.jackUID != nil { nextDue = now }
+            // A newly selected external output becomes eligible on the next tick without a user answer.
+            if route.externalOutputUID != nil { nextDue = now }
         }
         activity = readAudio(route.device)
         macOutputVolume = readOutputVolume(route.device)
@@ -206,7 +210,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             pendingPresenceReturn = false
         }
         captureState = CaptureState.detect(audioKnown: activity.known, microphoneBusy: activity.microphoneBusy)
-        if !consoleSessionAvailable || route.jackUID == nil {
+        if !consoleSessionAvailable || route.externalOutputUID == nil {
             stop(reason: "session_or_route_unavailable")
         } else if captureState != .clear {
             stop(reason: "microphone_protection") // Active or unknown microphone state also interrupts an explicit test.
@@ -214,6 +218,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             stop(reason: block(trigger: currentTrigger)?.rawValue ?? "policy_changed")
         }
         if playing { status = L10n.text(.wakePlaying) }
+        else if route.externalOutputUID == nil { status = unavailableOutputText }
         else if let block { status = Self.label(block) }
         else { status = L10n.text(.ready) }
         if profiles.isEmpty { status = L10n.text(.audioFilesUnavailable) }
@@ -229,11 +234,11 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let returned = pendingPresenceReturn
         pendingPresenceReturn = false
         if returned {
-            if smartMode && enabled && route.jackUID != nil && !playing {
+            if smartMode && enabled && route.externalOutputUID != nil && !playing {
                 play(trigger: .automatic, source: "presence_return")
                 return
             }
-            log("presence_return_skipped", ["reason": !enabled ? "auto_off" : !smartMode ? "smart_off" : playing ? "already_playing" : "no_jack"])
+            log("presence_return_skipped", ["reason": !enabled ? "auto_off" : !smartMode ? "smart_off" : playing ? "already_playing" : "no_external_output"])
         }
         // Discard stale timers after sleep or a long scheduling stall, never catch up with a sound.
         if now.timeIntervalSince(previous) > 60 {
@@ -253,7 +258,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         log("signal_requested", ["source": source])
         if let reason = block(trigger: trigger) {
             log("signal_blocked", ["source": source, "reason": reason.rawValue])
-            message = "\(L10n.text(.wakeBlocked)): \(Self.label(reason))"
+            message = "\(L10n.text(.wakeBlocked)): \(reason == .wrongOutput ? unavailableOutputText : Self.label(reason))"
             return
         }
         guard let profile = selectedProfile,
@@ -271,12 +276,12 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             candidate.delegate = self
             guard candidate.prepareToPlay(), candidate.currentDevice == route.uid else {
                 log("signal_failed", ["source": source, "reason": "device_binding_or_prepare"])
-                message = L10n.text(.jackUnavailable)
+                message = L10n.text(.outputUnavailable)
                 return
             }
             // The output can change while a file is loading. Recheck immediately before starting.
             let fresh = readRoute()
-            guard fresh == route, fresh.jackUID != nil, consoleSessionAvailable else {
+            guard fresh == route, fresh.externalOutputUID != nil, consoleSessionAvailable else {
                 hardwareChanged()
                 log("signal_failed", ["source": source, "reason": "route_changed_before_play"])
                 message = L10n.text(.routeChanged)
@@ -285,7 +290,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             refresh()
             if let reason = block(trigger: trigger) {
                 log("signal_blocked", ["source": source, "reason": reason.rawValue])
-                message = "\(L10n.text(.wakeBlocked)): \(Self.label(reason))"
+                message = "\(L10n.text(.wakeBlocked)): \(reason == .wrongOutput ? unavailableOutputText : Self.label(reason))"
                 return
             }
             currentTrigger = trigger
@@ -409,7 +414,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func updatePlaybackActivity() {
         // Keep our timer responsive during a listening session, even with no visible
         // window. This does not prevent display sleep or real system sleep.
-        let needed = enabled && smartMode && consoleSessionAvailable && route.jackUID != nil &&
+        let needed = enabled && smartMode && consoleSessionAvailable && route.externalOutputUID != nil &&
                      activity.known && activity.outputBusy
         if needed && timingActivity == nil {
             timingActivity = ProcessInfo.processInfo.beginActivity(options: Self.playbackActivityOptions,
@@ -430,7 +435,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             "sessionAvailable": sessionAvailable, "sessionSuspended": sessionSuspended,
             "sessionOnConsole": readSessionOnConsole(), "screensSleeping": screensSleeping,
             "screenLocked": screenLocked, "backgroundTimingActive": backgroundTimingActive,
-            "jackEligible": route.jackUID != nil, "device": route.device,
+            "externalOutputEligible": route.externalOutputUID != nil, "device": route.device,
             "activityKnown": activity.known, "microphoneBusy": activity.microphoneBusy,
             "outputBusy": activity.outputBusy, "signalVolume": volume,
             "macOutputVolume": macOutputVolume as Any? ?? NSNull(),
@@ -444,7 +449,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func recordState() {
-        let key = "\(enabled)|\(smartMode)|\(sessionAvailable)|\(route.device)|\(route.jackUID != nil)|\(activity.known)|\(activity.microphoneBusy)|\(activity.outputBusy)|\(macOutputVolume.map { Int(($0 * 1000).rounded()) } ?? -1)|\(block?.rawValue ?? "none")|\(playing)"
+        let key = "\(enabled)|\(smartMode)|\(sessionAvailable)|\(route.device)|\(route.externalOutputUID != nil)|\(activity.known)|\(activity.microphoneBusy)|\(activity.outputBusy)|\(macOutputVolume.map { Int(($0 * 1000).rounded()) } ?? -1)|\(block?.rawValue ?? "none")|\(playing)"
         if key != lastStateKey {
             lastStateKey = key
             log("state_changed")
@@ -459,7 +464,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         switch reason {
         case .paused: return L10n.text(.autoPaused)
         case .unavailableSession: return L10n.text(.sessionUnavailable)
-        case .wrongOutput: return L10n.text(.noJack)
+        case .wrongOutput: return L10n.text(.noExternalOutput)
         case .unknownActivity: return L10n.text(.unknownAudio)
         case .microphoneInUse: return L10n.text(.microphoneInUse)
         case .unknownCapture: return L10n.text(.unknownMicrophone)

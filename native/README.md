@@ -6,6 +6,12 @@ It never changes the Mac's volume or chosen output. Speaker wake-ups work offlin
 Update checks contact GitHub at app startup and every 12 hours while the app runs;
 downloads/installations require a click. There is no account, telemetry or upload.
 
+Version 1.7.13 makes availability follow the selected external audio output rather
+than a jack sensor. Analog, USB, Bluetooth, HDMI/DisplayPort and AirPlay outputs
+are eligible. Built-in Mac speakers show **Haut-parleurs du Mac utilisés · aucun
+réveil nécessaire** and disable the controls. The existing signal, saved gain,
+Auto preference and playback protections are preserved.
+
 Version 1.7.12 keeps automatic Smart Mode wake-ups running during detected output audio
 at any Mac volume, including when the current user’s screen is asleep or locked.
 It removes the former 50% cutoff and output-audio grace period. System sleep,
@@ -241,10 +247,11 @@ Applications before enabling **Ouvrir à la connexion**.
 
 1. The first launch is **paused**, with **20 Hz ×2** as the only signal and volume
    at 100%. Existing Chrome settings are not imported or modified.
-2. Keep the Mac's current output volume. Connect the jack and select it as the
+2. Keep the Mac's current output volume. Select your external speakers or audio interface as the
    Mac's audio output.
-3. The app detects the jack automatically; no speaker confirmation is needed.
-   Without an eligible jack output, it shows **Pas de connexion jack détectée**.
+3. The app detects the selected external output automatically; no speaker confirmation is needed.
+   Built-in speakers show **Haut-parleurs du Mac utilisés · aucun réveil nécessaire**.
+   An unavailable or unidentified output shows **Aucune sortie audio externe utilisable**.
 4. Pause the Chrome extension before testing or enabling the native app, to
    avoid two independent schedules sending signals.
 5. Click **Tester le réveil** to try the existing six-second waveform. Check both
@@ -254,37 +261,40 @@ Applications before enabling **Ouvrir à la connexion**.
    scheduled signal waits for eligibility instead of postponing another ten minutes.
 
 The signal volume and Auto choice are saved locally. The waveform is fixed to
-`sub2`; older profile preferences are ignored. Any device on the selected analog
-jack is eligible, including headphones. Detection does not establish whether the
+`sub2`; older profile preferences are ignored. External outputs are eligible,
+including headphones. Detection does not establish whether the
 connected device is a speaker or whether it is powered on. Reconnecting or changing
-to the jack requests a signal when Auto is enabled, subject to playback protections.
+to an external output requests a signal when Auto is enabled, subject to playback protections.
 
 ## Output and session protection
 
-Only an available built-in analog headphone/line output can qualify. The driver
-must identify it by transport and audio-stream terminal type or selected analog
-data source (including Apple's legacy IOAudio types); labels alone are
-never used to authorize playback. An explicitly disconnected jack is rejected.
-If the driver does not expose a jack control, its built-in analog stream identity
-is used instead. USB, Bluetooth, AirPlay, HDMI, aggregate devices, and internal
-speakers are not authorized in this first version.
+An available selected external output qualifies by its Core Audio transport,
+not its name or a jack-connection sensor. USB, Bluetooth/LE, AirPlay,
+HDMI/DisplayPort, Thunderbolt, FireWire, PCI and AVB outputs are eligible even
+when the driver omits terminal metadata. Built-in audio uses the selected data
+source or stream terminal to distinguish the Mac's speakers from its analog or
+digital external port. Unknown and virtual outputs remain unavailable.
+Aggregate/multi-output devices qualify only when every active output member is
+external; input-only members are ignored. A mix containing Mac speakers is blocked.
+This identifies the audio route, not whether a speaker is powered on or whether
+its standby mechanism responds to this signal.
 
 Before playback the app checks the active route and session again, binds the
 player to that device UID, and verifies the binding. Routing notifications stop
-playback and refresh jack detection. Fresh checks every second also catch
+playback and refresh output detection. Fresh checks every second also catch
 missed notifications. This reduces the risk of fallback playback; physical
 unplug/replug and route-change behavior still need testing on the real Mac.
 The tests verify the decision policy, not the driver's timing during hot unplug.
 
 System sleep and user-session deactivation always pause playback. Screen sleep
 and screen locking keep automatic Smart Mode signals eligible while known audio
-output continues on the current user's compatible jack. Manual tests remain
+output continues on the current user's external output. Manual tests remain
 unavailable on a dark/locked screen. Without output audio, the screen/session
 pause remains; 300 seconds without input and without audio also pauses Smart Mode.
 Real system sleep/resume discards delayed timers rather than playing missed signals.
 Screen sleep/wake does not reset the existing ten-minute listening schedule.
 An App Nap activity is held only while Auto and Smart Mode are on, the current
-console session and jack are eligible, and another process runs output there.
+console session and external output are eligible, and another process runs output there.
 It explicitly allows both display sleep and system sleep, and ends when these
 conditions stop or the model is destroyed.
 The app queries elapsed input time without reading keys or mouse coordinates.
@@ -303,7 +313,7 @@ without recording audio:
 Process-list, input/output activity and output-device notifications also refresh
 the state, so a new listening session can resume observation from App Nap.
 
-- Another process running output on the selected jack keeps automatic Smart Mode
+- Another process running output on the selected external output keeps automatic Smart Mode
   wake-ups eligible regardless of the Mac's output volume, including unavailable
   volume. There is no output-audio cutoff or grace period. The app still never
   changes the Mac's volume or the user's chosen signal gain.
@@ -339,7 +349,7 @@ The running menu-bar app writes JSON lines to
 small document button opens the folder. Three rotated archives are retained, each
 file limited to about 2 MiB (about 8 MiB total); retention depends on event volume.
 Nothing is uploaded. Logs contain timestamps in UTC, a launch ID/version/PID,
-Auto/Smart settings, jack eligibility, session state, elapsed input idle time,
+Auto/Smart settings, external-output eligibility, session state, elapsed input idle time,
 microphone/output activity, Mac and signal volume, current blocking reason,
 next deadline and last signal time. They contain no keystrokes, mouse coordinates,
 audio recordings or names of other applications.
@@ -359,13 +369,13 @@ use disabled or temporary loggers and never pollute production history.
 "output/native/Keep My Speakers Awake.app/Contents/MacOS/KMSA" --diagnose
 ```
 
-This prints the current route, jack eligibility, Core Audio activity state,
+This prints the current route, external-output eligibility, Core Audio activity state,
 Mac output volume, input idle duration, camera running metadata, and
 packaged profile availability. It does not launch the menu bar app or play audio.
 Device UIDs in this output are local identifiers; no diagnostics are uploaded.
 
 The executable also accepts `--self-check`: it checks the real model's paused
-defaults, automatic jack detection, packaged audio decoding, scheduling, and device
+defaults, automatic external-output detection, packaged audio decoding, scheduling, and device
 binding without starting playback or changing the user's saved preferences.
 It also injects active/unknown/idle microphone states with Smart Mode on and off
 to check blocking and immediate recovery without starting actual capture.

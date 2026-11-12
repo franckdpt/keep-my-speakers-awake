@@ -35,7 +35,8 @@ public enum AppText: String, CaseIterable {
     case aboutSmartMode
     case smartModeHint
     case openAtLogin
-    case noJack
+    case builtInSpeakers
+    case noExternalOutput
     case quit
     case githubRepository
     case checkUpdates, checkingUpdates, appUpToDate, updateAvailable, updateExplanation
@@ -47,7 +48,7 @@ public enum AppText: String, CaseIterable {
     case audioFilesUnavailable
     case wakeBlocked
     case wakeFileMissing
-    case jackUnavailable
+    case outputUnavailable
     case routeChanged
     case playbackFailed
     case playbackInterrupted
@@ -81,7 +82,8 @@ public enum AppText: String, CaseIterable {
         case .aboutSmartMode: copy = ("À propos du mode intelligent", "About smart mode")
         case .smartModeHint: copy = ("Afficher les règles de réveil des enceintes", "Show the speaker wake-up rules")
         case .openAtLogin: copy = ("Ouvrir avec la session", "Open at login")
-        case .noJack: copy = ("Pas de connexion jack détectée", "No jack connection detected")
+        case .builtInSpeakers: copy = ("Haut-parleurs du Mac utilisés · aucun réveil nécessaire", "Mac speakers in use · no wake-up needed")
+        case .noExternalOutput: copy = ("Aucune sortie audio externe utilisable", "No usable external audio output")
         case .githubRepository: copy = ("GitHub : étoiles, questions et signalements", "GitHub: stars, issues and source code")
         case .checkUpdates: copy = ("Chercher une mise à jour", "Check for Updates")
         case .checkingUpdates: copy = ("Recherche en cours…", "Checking for updates…")
@@ -104,11 +106,11 @@ public enum AppText: String, CaseIterable {
         case .quit: copy = ("Quitter", "Quit")
         case .paused: copy = ("En pause", "Paused")
         case .wakePlaying: copy = ("Réveil en cours…", "Wake-up in progress…")
-        case .ready: copy = ("Prêt · connexion jack détectée", "Ready · jack connection detected")
+        case .ready: copy = ("Prêt · sortie audio externe", "Ready · external audio output")
         case .audioFilesUnavailable: copy = ("Fichiers audio indisponibles", "Audio files unavailable")
         case .wakeBlocked: copy = ("Réveil bloqué", "Wake-up blocked")
         case .wakeFileMissing: copy = ("Fichier du réveil introuvable.", "Wake-up audio file not found.")
-        case .jackUnavailable: copy = ("Impossible de réserver la sortie jack.", "Unable to reserve the jack output.")
+        case .outputUnavailable: copy = ("Impossible de réserver la sortie audio externe.", "Unable to reserve the external audio output.")
         case .routeChanged: copy = ("Sortie modifiée : réveil annulé.", "Output changed: wake-up cancelled.")
         case .playbackFailed: copy = ("Impossible de lire le réveil.", "Unable to play the wake-up audio.")
         case .playbackInterrupted: copy = ("La lecture du réveil a été interrompue.", "Wake-up playback was interrupted.")

@@ -9,14 +9,14 @@ public enum PlaybackTrigger {
     case automatic, manualTest
 }
 
-/// Explicit tests bypass the schedule and inactivity check, never the session, screen, jack, or capture protection.
+/// Explicit tests bypass the schedule and inactivity check, never the session, screen, external-output, or capture protection.
 public struct PlaybackPolicy {
     public static let interval: TimeInterval = 600
     public static let idleThreshold: TimeInterval = 300
 
     public static func block(
         enabled: Bool, trigger: PlaybackTrigger, sessionAvailable: Bool, screenAvailable: Bool = true,
-        jackUID: String?, smartMode: Bool,
+        externalOutputUID: String?, smartMode: Bool,
         activityKnown: Bool, audioBusy: Bool,
         captureState: CaptureState = .clear,
         idleSeconds: TimeInterval?
@@ -28,7 +28,7 @@ public struct PlaybackPolicy {
         if !screenAvailable && !(trigger == .automatic && smartMode && activityKnown && audioBusy) {
             return .unavailableSession
         }
-        guard let jackUID, !jackUID.isEmpty else { return .wrongOutput }
+        guard let externalOutputUID, !externalOutputUID.isEmpty else { return .wrongOutput }
         // Microphone protection applies to every signal, independently of Smart Mode.
         switch captureState {
         case .microphone: return .microphoneInUse

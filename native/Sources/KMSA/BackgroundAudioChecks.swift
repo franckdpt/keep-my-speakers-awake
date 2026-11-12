@@ -12,7 +12,7 @@ extension AppModel {
         var idle: TimeInterval? = 0
         var audio = HAL.Activity(known: true, microphoneBusy: false, outputBusy: true)
         var macVolume: Double? = 0.0625
-        var route = HAL.Route(device: 0, uid: "background-check-jack", name: "Silent check", isJack: true, alive: true)
+        var route = HAL.Route(device: 0, uid: "background-check-jack", name: "Silent check", outputKind: .external, alive: true)
         var starts = 0
         var leaveSessionDuringPreparation = false
         var signalLevels: [Float] = []
@@ -94,7 +94,7 @@ extension AppModel {
         route = HAL.Route()
         model.refresh()
         precondition(model.block == .wrongOutput && !model.playing && !model.backgroundTimingActive)
-        route = HAL.Route(device: 0, uid: "background-check-jack", name: "Silent check", isJack: true, alive: true)
+        route = HAL.Route(device: 0, uid: "background-check-jack", name: "Silent check", outputKind: .external, alive: true)
         model.refresh()
 
         // Fast user switching and real system sleep stay independent hard gates.

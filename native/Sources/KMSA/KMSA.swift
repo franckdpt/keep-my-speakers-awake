@@ -48,7 +48,7 @@ enum EntryPoint {
             defer { defaults.removePersistentDomain(forName: suite) }
             _ = NSApplication.shared
             let model = AppModel(defaults: defaults,
-                                readRoute: { CommandLine.arguments.contains("--no-device") ? HAL.Route() : HAL.Route(device: 0, uid: "preview-jack", name: "Jack de prévisualisation", isJack: true, alive: true) },
+                                readRoute: { CommandLine.arguments.contains("--no-device") ? HAL.Route() : HAL.Route(device: 0, uid: "preview-output", name: "Preview output", outputKind: CommandLine.arguments.contains("--built-in") ? .builtInSpeakers : .external, alive: true) },
                                 readAudio: { _ in HAL.Activity(known: true, microphoneBusy: false, outputBusy: false) },
                                 readOutputVolume: { _ in 0.25 }, readIdleSeconds: { 0 },
                                 makePlayer: { _ in let player = SilentCheckPlayer(); player.onPlay = { true }; return player })
@@ -107,6 +107,7 @@ enum EntryPoint {
             PanelCorners.runChecks()
             AppModel.runCountdownChecks()
             AppModel.runBackgroundAudioChecks()
+            AppModel.runOutputRouteChecks()
             let suite = "fr.franckdupont.kmsa.check.\(UUID().uuidString)"
             let defaults = UserDefaults(suiteName: suite)!
             defer { defaults.removePersistentDomain(forName: suite) }
@@ -125,18 +126,18 @@ enum EntryPoint {
             }
             model.enabled = true
             precondition(!model.playing && model.nextDue.timeIntervalSinceNow > 590)
-            model.testSignal() // No jack must block playback before any player is created.
-            precondition(!model.playing && model.route.jackUID == nil)
-            precondition(model.message == "\(L10n.text(.wakeBlocked)): \(L10n.text(.noJack))")
+            model.testSignal() // No external output must block playback before any player is created.
+            precondition(!model.playing && model.route.externalOutputUID == nil)
+            precondition(model.message == "\(L10n.text(.wakeBlocked)): \(L10n.text(.noExternalOutput))")
             model.enabled = false
             var simulatedAudio = HAL.Activity(known: true, microphoneBusy: false, outputBusy: false)
-            var simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", isJack: true, alive: true)
+            var simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", outputKind: .external, alive: true)
             var simulatedVolume: Double? = 0.0625
             let protectedModel = AppModel(defaults: defaults, readRoute: { simulatedRoute },
                                           readAudio: { _ in simulatedAudio }, readOutputVolume: { _ in simulatedVolume },
                                           readIdleSeconds: { 0 }, makePlayer: { _ in SilentCheckPlayer() })
             if protectedModel.sessionAvailable {
-                precondition(protectedModel.canTest && protectedModel.route.jackUID == "check-jack")
+                precondition(protectedModel.canTest && protectedModel.route.externalOutputUID == "check-jack")
                 simulatedRoute.uid = "another-check-jack"
                 protectedModel.refresh()
                 precondition(protectedModel.canTest)
@@ -145,10 +146,10 @@ enum EntryPoint {
                 precondition(!protectedModel.canTest)
                 protectedModel.testSignal()
                 precondition(!protectedModel.playing)
-                simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", isJack: true, alive: true)
+                simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", outputKind: .external, alive: true)
                 protectedModel.refresh()
                 precondition(protectedModel.canTest)
-                print("Jack detection: connected and reconnected routes are eligible without confirmation; unplug blocks Test. No audio played.")
+                print("External output detection: connected and reconnected routes are eligible without confirmation; unplug blocks Test. No audio played.")
                 protectedModel.enabled = true
                 simulatedAudio.outputBusy = true
                 protectedModel.refresh()
@@ -249,7 +250,7 @@ enum EntryPoint {
                 simulatedRoute = HAL.Route()
                 triggerModel.tick()
                 precondition(!triggerModel.playing && !triggerModel.canTest && signalStarts == 4)
-                simulatedRoute = HAL.Route(device: 0, uid: "reconnected-jack", name: "Jack de test", isJack: true, alive: true)
+                simulatedRoute = HAL.Route(device: 0, uid: "reconnected-jack", name: "Jack de test", outputKind: .external, alive: true)
                 triggerModel.tick()
                 precondition(triggerModel.playing && signalStarts == 5)
                 triggerModel.tick()
@@ -260,7 +261,7 @@ enum EntryPoint {
                 triggerModel.testSignal()
                 precondition(signalStarts == 5)
                 triggerModel.enabled = false
-                simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", isJack: true, alive: true)
+                simulatedRoute = HAL.Route(device: 0, uid: "check-jack", name: "Jack de test", outputKind: .external, alive: true)
                 triggerModel.tick()
                 precondition(signalStarts == 5 && !triggerModel.playing && triggerModel.canTest)
                 triggerModel.enabled = true
@@ -270,7 +271,7 @@ enum EntryPoint {
                 triggerModel.stop()
                 precondition(!triggerModel.playing && !triggerModel.isTesting)
                 print("Test button: Auto-on keeps the wake-test action; a manual test, including during automatic playback, exposes Stop until stopped. No audio played.")
-                print("Jack connection starts one automatic signal when Auto is on; unplug stops playback, reconnect needs no answer, and Auto-off stays paused. In-memory players only.")
+                print("An external output starts one automatic signal when Auto is on; unplug stops playback, reconnect needs no answer, and Auto-off stays paused. In-memory players only.")
             }
             defaults.set(false, forKey: "enabled")
             defaults.set(true, forKey: "smartMode")
@@ -436,15 +437,15 @@ enum EntryPoint {
             }
             print("Localized blocked/failed playback messages use the app language, including errors supplied in another language. No audio played.")
             let route = HAL.route()
-            if let uid = route.jackUID {
+            if let uid = route.externalOutputUID {
                 let player = try! AVAudioPlayer(contentsOf: AppModel.resource("sub2", ext: "wav")!)
                 player.currentDevice = uid
                 player.volume = 0
                 precondition(player.prepareToPlay() && player.currentDevice == uid)
                 player.stop()
-                print("AVAudioPlayer prepared and bound to the current jack, without starting playback.")
+                print("AVAudioPlayer prepared and bound to the current external output, without starting playback.")
             }
-            print("Native self-check passed: paused first launch, sub2 only (legacy choice ignored), one decodable stereo WAV, automatic jack eligibility, disconnected playback blocked. No audio played.")
+            print("Native self-check passed: paused first launch, sub2 only (legacy choice ignored), one decodable stereo WAV, automatic external output eligibility, disconnected playback blocked. No audio played.")
             return
         }
         if CommandLine.arguments.contains("--diagnose") {
@@ -485,7 +486,7 @@ struct KMSAApplication: App {
         MenuBarExtra {
             ControlPanel(model: model, updater: updater).environment(\.locale, L10n.locale)
         } label: {
-            Image(nsImage: MenuBarIcon.image(active: model.enabled && model.route.jackUID != nil, updateAvailable: updater.hasUpdate))
+            Image(nsImage: MenuBarIcon.image(active: model.enabled && model.route.externalOutputUID != nil, updateAvailable: updater.hasUpdate))
                 .accessibilityLabel(updater.hasUpdate ? "Keep My Speakers Awake — \(L10n.text(.updateAvailable))" : "Keep My Speakers Awake")
                 .help("Keep My Speakers Awake — \(updater.hasUpdate ? L10n.text(.updateAvailable) : model.status)")
         }
@@ -550,21 +551,21 @@ struct ControlPanel: View {
             HStack(spacing: 10) {
                 Image(systemName: "hifispeaker.fill")
                     .font(.system(size: 30))
-                    .foregroundStyle(model.enabled && model.route.jackUID != nil ? Color.green : anthracite)
+                    .foregroundStyle(model.enabled && model.route.externalOutputUID != nil ? Color.green : anthracite)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep My Speakers Awake").font(.headline)
                     Text(L10n.text(.subtitle)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 Toggle(L10n.text(.enableApp), isOn: Binding(
-                    get: { model.enabled && model.route.jackUID != nil },
+                    get: { model.enabled && model.route.externalOutputUID != nil },
                     set: { model.enabled = $0 }
                 ))
                     .labelsHidden().toggleStyle(.switch).controlSize(.small).fixedSize()
-                    .disabled(model.route.jackUID == nil)
+                    .disabled(model.route.externalOutputUID == nil)
             }
 
-            if model.route.jackUID != nil {
+            if model.route.externalOutputUID != nil {
                 VStack(spacing: 5) {
                     HStack {
                         Text(L10n.text(.wakeVolume)).font(.subheadline)
@@ -616,8 +617,9 @@ struct ControlPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if model.route.jackUID == nil {
-                Text(L10n.text(.noJack))
+            if model.route.externalOutputUID == nil {
+                Text(model.unavailableOutputText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             VStack(spacing: 8) {
@@ -706,7 +708,7 @@ private struct PanelCorners: NSViewRepresentable {
         private func scheduleLayout() {
             guard !layoutScheduled else { return }
             layoutScheduled = true
-            // MenuBarExtra can recenter a shorter panel after the jack controls
+            // MenuBarExtra can recenter a shorter panel after the output controls
             // disappear. Wait for its layout, then keep the top below the menu bar.
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }

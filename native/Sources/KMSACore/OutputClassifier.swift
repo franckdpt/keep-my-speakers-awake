@@ -1,16 +1,43 @@
 import CoreAudio
 import IOKit.audio
 
+public enum OutputKind: String, Codable {
+    case external, builtInSpeakers, unavailable
+}
+
 public enum OutputClassifier {
-    public static func isBuiltInJack(transport: UInt32, terminals: [UInt32], sources: [UInt32],
-                                     jackControl: UInt32?, alive: Bool) -> Bool {
-        guard alive, transport == kAudioDeviceTransportTypeBuiltIn, jackControl != 0 else { return false }
-        // Apple drivers expose both modern Core Audio terminal FourCCs and legacy IOAudio terminal types.
-        let analogTerminal = terminals.contains(kAudioStreamTerminalTypeHeadphones)
-            || terminals.contains(kAudioStreamTerminalTypeLine)
-            || terminals.contains(UInt32(OUTPUT_HEADPHONES))
-        let analogSource = sources.contains(UInt32(kIOAudioOutputPortSubTypeHeadphones))
-            || sources.contains(UInt32(kIOAudioOutputPortSubTypeLine))
-        return analogTerminal || analogSource
+    /// Classify the selected output, independently of a physical jack sensor or its name.
+    public static func classify(transport: UInt32, terminals: [UInt32], sources: [UInt32],
+                                alive: Bool, hasOutput: Bool,
+                                suboutputs: [OutputKind] = []) -> OutputKind {
+        guard alive, hasOutput else { return .unavailable }
+        if transport == kAudioDeviceTransportTypeBuiltIn {
+            // A selected source takes precedence on devices that share speakers and a port.
+            if sources.contains(UInt32(kIOAudioOutputPortSubTypeInternalSpeaker)) { return .builtInSpeakers }
+            let externalSources = [kIOAudioOutputPortSubTypeHeadphones, kIOAudioOutputPortSubTypeLine,
+                                   kIOAudioOutputPortSubTypeExternalSpeaker, kIOAudioOutputPortSubTypeSPDIF].map { UInt32($0) }
+            if sources.contains(where: { externalSources.contains($0) }) { return .external }
+            if terminals.contains(kAudioStreamTerminalTypeSpeaker) || terminals.contains(UInt32(OUTPUT_SPEAKER)) {
+                return .builtInSpeakers
+            }
+            let externalTerminals = [kAudioStreamTerminalTypeHeadphones, kAudioStreamTerminalTypeLine,
+                                     kAudioStreamTerminalTypeDigitalAudioInterface, UInt32(OUTPUT_HEADPHONES),
+                                     UInt32(EXTERNAL_ANALOG_CONNECTOR), UInt32(EXTERNAL_DIGITAL_AUDIO_INTERFACE)]
+            return terminals.contains(where: { externalTerminals.contains($0) }) ? .external : .unavailable
+        }
+        if transport == kAudioDeviceTransportTypeAggregate {
+            // Multi-output devices must never carry the signal to the Mac's own speakers.
+            return !suboutputs.isEmpty && suboutputs.allSatisfy { $0 == .external } ? .external : .unavailable
+        }
+        switch transport {
+        case kAudioDeviceTransportTypeUSB, kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE,
+             kAudioDeviceTransportTypeHDMI, kAudioDeviceTransportTypeDisplayPort, kAudioDeviceTransportTypeAirPlay,
+             kAudioDeviceTransportTypeThunderbolt, kAudioDeviceTransportTypeFireWire, kAudioDeviceTransportTypePCI,
+             kAudioDeviceTransportTypeAVB:
+            return .external
+        default:
+            // Virtual/unknown devices do not establish where the sound will physically play.
+            return .unavailable
+        }
     }
 }

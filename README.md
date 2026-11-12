@@ -3,8 +3,9 @@
 A tiny Mac app that prevents speaker standby.
 
 Native menu bar utility for **Apple Silicon**, **macOS 14.2+**, with automatic
-French / English copy. Uses a low-frequency signal on the Mac's built-in analog
-jack output. Microphone activity and other playback protections are checked
+French / English copy. Uses a low-frequency signal on the selected external audio
+output (analog, USB, Bluetooth, HDMI/DisplayPort or AirPlay). The Mac's built-in
+speakers need no wake-up and keep the controls unavailable. Microphone activity and other playback protections are checked
 before signals. Speaker wake-up effectiveness depends on the hardware.
 
 **[Download the latest DMG](https://github.com/franckdpt/keep-my-speakers-awake/releases/latest/download/Keep-My-Speakers-Awake-Apple-Silicon.dmg)** · [Website](https://franckdupont.com/kmsa/)

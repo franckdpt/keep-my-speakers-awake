@@ -42,7 +42,7 @@ extension AppModel {
             model.tick()
             precondition(starts == previous + 1 && model.volume == 0.35)
             route = builtIn
-            model.refresh()
+            model.hardwareChanged()
             precondition(!model.canTest && !model.playing && model.enabled)
             precondition(model.status == L10n.text(.builtInSpeakers))
             model.testSignal()

@@ -179,9 +179,9 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
                              idleSeconds: idleSeconds)
     }
 
-    private func hardwareChanged() {
+    func hardwareChanged() {
         log("hardware_notification")
-        stop(reason: "hardware_notification")
+        // A notification can concern another device. Refresh stops playback if the selected route or policy changes.
         refresh()
     }
 

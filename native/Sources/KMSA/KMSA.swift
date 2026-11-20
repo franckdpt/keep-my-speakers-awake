@@ -343,7 +343,8 @@ enum EntryPoint {
             var wakeSignals = 0
             var wakeMicrophone = false
             let wakeModel = AppModel(defaults: wakeDefaults, diagnostics: wakeLog, clock: { wakeClock },
-                                     readSessionAvailable: { unlocked }, readRoute: { simulatedRoute },
+                                     readSessionAvailable: { unlocked }, readSessionOnConsole: { true },
+                                     readRoute: { simulatedRoute },
                                      readAudio: { _ in HAL.Activity(known: true, microphoneBusy: wakeMicrophone, outputBusy: false) },
                                      readOutputVolume: { _ in 0.0625 }, readIdleSeconds: { wakeIdle },
                                      makePlayer: { _ in
@@ -356,24 +357,35 @@ enum EntryPoint {
             precondition(wakeSignals == 1)
             wakeIdle = 900
             wakeModel.tick()
-            wakeModel.suspend(reason: "check_screen_off")
+            wakeModel.setScreenLocked(true)
+            wakeModel.setScreensSleeping(true)
             wakeClock.addTimeInterval(3 * 3600)
             unlocked = false
-            wakeIdle = 0
-            wakeModel.resume(reason: "check_screen_on_still_locked")
+            wakeModel.setScreensSleeping(false)
             wakeModel.tick()
             precondition(wakeSignals == 1 && wakeModel.block == .unavailableSession)
             unlocked = true
-            wakeModel.resume(reason: "check_unlocked")
-            wakeModel.resume(reason: "check_duplicate_wake")
+            wakeIdle = 0
+            wakeModel.setScreenLocked(false)
+            wakeModel.setScreensSleeping(false)
             wakeModel.tick()
             precondition(wakeSignals == 2 && wakeModel.playing)
+            let wakeDue = wakeModel.nextDue
+            // Core Audio can report device changes just after unlock with the selected route intact.
+            for _ in 1...2 {
+                wakeClock.addTimeInterval(1)
+                wakeModel.hardwareChanged()
+                wakeModel.tick()
+                precondition(wakeSignals == 2 && wakeModel.playing && wakeModel.nextDue == wakeDue,
+                             "Hardware notifications for an unchanged output must preserve the wake signal")
+            }
             wakeModel.stop()
             wakeModel.tick()
             precondition(wakeSignals == 2)
             // Sleep can start before the five-minute idle threshold has been observed.
             wakeModel.suspend()
             wakeClock.addTimeInterval(301)
+            wakeModel.resume()
             wakeModel.resume()
             wakeModel.tick()
             precondition(wakeSignals == 3)
@@ -405,7 +417,7 @@ enum EntryPoint {
             precondition(wakeLines.contains { $0["event"] as? String == "signal_blocked" && $0["reason"] as? String == "microphoneInUse" && $0["source"] as? String == "presence_return" })
             precondition(wakeLines.contains { $0["event"] as? String == "session_suspended" })
             precondition(wakeLines.contains { $0["event"] as? String == "heartbeat" })
-            print("Screen sleep/lock regression passed: one return signal after hours away, duplicate wakes coalesced, dark wakes/microphone/Auto-off stay silent. In-memory players only.")
+            print("Screen sleep/lock regression passed: one return signal after hours away survives unchanged-route notifications; dark wakes, microphone and Auto-off stay silent. In-memory players only.")
 
             let logFolder = FileManager.default.temporaryDirectory.appendingPathComponent("kmsa-log-check-\(UUID().uuidString)")
             defer { try? FileManager.default.removeItem(at: logFolder) }
